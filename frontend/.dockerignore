@@ -1,0 +1,9 @@
+node_modules
+dist
+.vite
+# La key llega por build arg, no copiando archivos .env locales a la imagen.
+.env
+.env.*
+!.env.example
+.git
+*.log
