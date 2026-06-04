@@ -1,4 +1,4 @@
-# vigi.ai
+# Diffix
 
 SaaS de inteligencia competitiva para distribuidoras argentinas. Monitorea competidores automáticamente, detecta cambios y genera insights accionables en español con IA. Todo el producto es en español.
 
@@ -35,3 +35,12 @@ SaaS de inteligencia competitiva para distribuidoras argentinas. Monitorea compe
 ## Fuera del MVP
 
 No implementar: chat con agentes, Writer Agent, Discovery Agent, Slack, CRM, API pública, app móvil, multi-idioma, SSO, microservicios, fine-tuning, Ollama en prod. Si surge → post-MVP.
+
+## Git
+
+- Todo trabajo nace en un issue de Linear. Sin issue → sin rama.
+- **Rama:** usar el nombre que genera Linear — `eng/DIX-42-titulo-del-issue`
+- **Flujo:** `feature/DIX-xxx → dev → staging → main`
+- **Commit:** `tipo(scope): descripción [DIX-123]` — tipos: `feat` `fix` `chore` `refactor` `test` `docs`
+- **PR:** título igual al commit principal. Descripción en `.github/pull_request_template.md`, siempre incluir `Closes DIX-123`.
+- PRs a `main` y `staging` requieren CI verde + 1 approval. A `dev` libre.
