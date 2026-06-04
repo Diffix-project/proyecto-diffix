@@ -98,18 +98,18 @@ def seed(db) -> None:  # type: ignore[no-untyped-def]
 
     src_norte_1_web = _upsert_source(db, comp_norte_1, "website", "https://alimentosdelsur.com.ar/precios")
     src_norte_2_web = _upsert_source(db, comp_norte_2, "website", "https://distpampa.com.ar")
-    src_norte_2_ml  = _upsert_source(db, comp_norte_2, "mercadolibre", None, config={"seller_id": "12345678"})
+    _upsert_source(db, comp_norte_2, "mercadolibre", None, config={"seller_id": "12345678"})
 
-    src_tech_1_web  = _upsert_source(db, comp_tech_1, "website", "https://techsupply.com.ar/catalogo")
+    _upsert_source(db, comp_tech_1, "website", "https://techsupply.com.ar/catalogo")
     src_tech_1_jobs = _upsert_source(db, comp_tech_1, "jobs", "https://techsupply.com.ar/empleos")
     src_tech_2_web  = _upsert_source(db, comp_tech_2, "website", "https://compuparts.com.ar")
-    src_tech_2_ml   = _upsert_source(db, comp_tech_2, "mercadolibre", None, config={"seller_id": "87654321"})
+    _upsert_source(db, comp_tech_2, "mercadolibre", None, config={"seller_id": "87654321"})
     src_tech_3_web  = _upsert_source(db, comp_tech_3, "website", "https://digitaldist.com.ar/precios")
-    src_tech_4_web  = _upsert_source(db, comp_tech_4, "website", "https://mercatech.com.ar")
+    _upsert_source(db, comp_tech_4, "website", "https://mercatech.com.ar")
 
     src_const_1_web = _upsert_source(db, comp_const_1, "website", "https://cementoplus.com.ar/lista-precios")
-    src_const_2_web = _upsert_source(db, comp_const_2, "website", "https://ferreteriacentral.com.ar")
-    src_const_3_web = _upsert_source(db, comp_const_3, "website", "https://materiabuild.com.ar")
+    _upsert_source(db, comp_const_2, "website", "https://ferreteriacentral.com.ar")
+    _upsert_source(db, comp_const_3, "website", "https://materiabuild.com.ar")
 
     db.commit()
     print("✓ Fuentes")
