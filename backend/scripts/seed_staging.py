@@ -35,7 +35,7 @@ from app.domains.sources.models import CompetitorSource
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 
-NOW = datetime.now(timezone.UTC)
+NOW = datetime.now(timezone.utc)
 
 
 def seed(db) -> None:  # type: ignore[no-untyped-def]
