@@ -125,6 +125,24 @@ export function useAddSource(competitorId: string) {
   })
 }
 
+export function useUploadPdf(competitorId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('competitor_id', competitorId)
+      const { data } = await api.post('/uploads/pdf', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: competitorKeys.sources(competitorId) })
+    },
+  })
+}
+
 export function useDeleteSource(competitorId: string) {
   const qc = useQueryClient()
   return useMutation({

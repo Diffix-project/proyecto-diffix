@@ -126,22 +126,22 @@ def send_weekly_digests(self):  # type: ignore[no-untyped-def]
 
 
 @celery_app.task(name="app.workers.tasks.parse_pdf", bind=True)
-def parse_pdf(self, snapshot_key: str, competitor_id: str):  # type: ignore[no-untyped-def]
+def parse_pdf(self, source_id: str, snapshot_key: str):  # type: ignore[no-untyped-def]
     """
     Extrae texto de un PDF almacenado en R2 y lo procesa como snapshot.
 
-    Encolada desde el endpoint POST /uploads/pdf cuando el agente C sube el archivo a R2.
+    Encolada desde el endpoint POST /uploads/pdf tras crear la CompetitorSource.
 
     TODO (fase Analyst): implementar extracción y comparación:
       - Descargar PDF de R2 via integrations.storage.generate_presigned_url
       - Extraer texto con LLM (integrations.llm.complete_json o herramienta de parsing)
-      - Comparar hash SHA256 con snapshot anterior del mismo competidor (source_type=pdf)
+      - Comparar hash SHA256 con snapshot anterior de la misma fuente (source_id)
       - Si hay diff significativo: crear Snapshot + Change en DB
       - Encolar analyze_change.delay(change_id)
     """
     logger.info(
-        "parse_pdf [placeholder] snapshot_key=%s competitor_id=%s",
+        "parse_pdf [placeholder] source_id=%s snapshot_key=%s",
+        source_id,
         snapshot_key,
-        competitor_id,
     )
     # TODO: fase Analyst
