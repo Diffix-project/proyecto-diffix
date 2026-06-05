@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.core.deps import get_current_db_user
 from app.domains.auth.models import User
 from app.domains.competitors.models import Competitor
+from app.domains.sources.models import CompetitorSource
 from app.integrations import storage
 from app.workers.tasks import parse_pdf
 
@@ -47,7 +48,17 @@ def upload_pdf(
     content = file.file.read()
     key = f"pdfs/{competitor_id}/{uuid.uuid4()}.pdf"
     storage.upload_bytes(key, content, "application/pdf")
-    parse_pdf.delay(key, str(competitor_id))
 
-    logger.info("uploads: pdf encolado key=%s competitor=%s", key, competitor_id)
-    return {"key": key, "status": "encolado", "competitor_id": str(competitor_id)}
+    source = CompetitorSource(
+        competitor_id=competitor_id,
+        source_type="pdf",
+        source_url=key,
+    )
+    db.add(source)
+    db.commit()
+    db.refresh(source)
+
+    parse_pdf.delay(str(source.id), key)
+
+    logger.info("uploads: pdf registrado source=%s key=%s competitor=%s", source.id, key, competitor_id)
+    return {"key": key, "status": "encolado", "source_id": str(source.id), "competitor_id": str(competitor_id)}
