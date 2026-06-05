@@ -1,4 +1,4 @@
-# vigi.ai
+# Diffix
 
 SaaS de inteligencia competitiva automatizada para distribuidoras argentinas. Monitorea competidores, detecta cambios y genera insights accionables en español con IA.
 
