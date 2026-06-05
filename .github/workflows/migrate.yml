@@ -1,0 +1,39 @@
+name: Migrate
+
+on:
+  push:
+    branches: [main, staging]
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    name: Migrate ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Instalar dependencias
+        run: pip install -e "."
+
+      - name: Alembic upgrade head
+        run: alembic upgrade head
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Seed staging
+        if: github.ref_name == 'staging'
+        run: python scripts/seed_staging.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

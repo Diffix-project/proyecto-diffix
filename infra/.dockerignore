@@ -1,0 +1,51 @@
+# Control de versiones
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+.eggs
+dist
+build
+.venv
+venv
+env
+
+# uv
+.uv
+
+# Node
+node_modules
+frontend/node_modules
+frontend/dist
+frontend/.vite
+
+# Archivos de entorno (usar .env en runtime, nunca en la imagen)
+.env
+.env.*
+!.env.example
+
+# IDE y editores
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests
+.pytest_cache
+.mypy_cache
+.ruff_cache
+htmlcov
+.coverage
+
+# Logs
+*.log

@@ -1,0 +1,119 @@
+services:
+  # ─── Base de datos principal ───────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: vigi
+      POSTGRES_PASSWORD: vigi
+      POSTGRES_DB: vigi
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vigi"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ─── Redis (broker Celery + result backend) ────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ─── API FastAPI ───────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ../backend
+      target: production
+    env_file: ../.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Worker Celery ─────────────────────────────────────────────────────────
+  # Misma imagen que api, command override para iniciar el worker.
+  worker:
+    build:
+      context: ../backend
+      target: production
+    command: uv run celery -A app.core.celery_app.celery_app worker -l info -c 4
+    env_file: ../.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Beat Celery (scheduler) ───────────────────────────────────────────────
+  # Misma imagen que api, command override para iniciar el scheduler.
+  beat:
+    build:
+      context: ../backend
+      target: production
+    command: uv run celery -A app.core.celery_app.celery_app beat -l info
+    env_file: ../.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Langfuse (observabilidad LLM, self-hosted para desarrollo) ────────────
+  langfuse-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
+      POSTGRES_DB: langfuse
+    volumes:
+      - langfuse_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  langfuse:
+    image: langfuse/langfuse:2
+    environment:
+      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-postgres:5432/langfuse
+      NEXTAUTH_SECRET: langfuse_dev_secret_change_in_prod
+      NEXTAUTH_URL: http://localhost:3000
+      SALT: langfuse_dev_salt_change_in_prod
+    ports:
+      - "3000:3000"
+    depends_on:
+      langfuse-postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Frontend React/Vite ───────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ../frontend
+      target: production
+      args:
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    env_file: ../.env
+    ports:
+      - "5173:5173"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  langfuse_postgres_data:
