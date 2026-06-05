@@ -24,15 +24,9 @@ from app.core.config import settings  # noqa: E402
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
 # ─── Importar todos los modelos para registrar sus tablas en metadata ─────────
-# Este import explícito es CRÍTICO: sin él, autogenerate no detecta las tablas.
-import app.domains.auth.models  # noqa: F401, E402
-import app.domains.changes.models  # noqa: F401, E402
-import app.domains.competitors.models  # noqa: F401, E402
-import app.domains.digests.models  # noqa: F401, E402
-import app.domains.insights.models  # noqa: F401, E402
-import app.domains.notifications.models  # noqa: F401, E402
-import app.domains.sources.models  # noqa: F401, E402
-from app.core.base import Base  # noqa: E402
+# app.models centraliza los 7 modelos. Este import es CRÍTICO: sin él,
+# autogenerate no detecta las tablas y los mappers no resuelven sus relaciones.
+from app.models import Base  # noqa: E402
 
 target_metadata = Base.metadata
 
