@@ -13,7 +13,7 @@ Uso:
 
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 # Asegurar que el path incluya el backend para importar app.*
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -35,7 +35,7 @@ from app.domains.sources.models import CompetitorSource
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 
-NOW = datetime.now(timezone.utc)
+NOW = datetime.now(UTC)
 
 
 def seed(db) -> None:  # type: ignore[no-untyped-def]
