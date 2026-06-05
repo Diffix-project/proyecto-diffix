@@ -30,9 +30,9 @@ services:
   # ─── API FastAPI ───────────────────────────────────────────────────────────
   api:
     build:
-      context: ../backend
+      context: ./backend
       target: production
-    env_file: ../.env
+    env_file: .env
     ports:
       - "8000:8000"
     depends_on:
@@ -46,10 +46,10 @@ services:
   # Misma imagen que api, command override para iniciar el worker.
   worker:
     build:
-      context: ../backend
+      context: ./backend
       target: production
     command: uv run celery -A app.core.celery_app.celery_app worker -l info -c 4
-    env_file: ../.env
+    env_file: .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,10 +61,10 @@ services:
   # Misma imagen que api, command override para iniciar el scheduler.
   beat:
     build:
-      context: ../backend
+      context: ./backend
       target: production
     command: uv run celery -A app.core.celery_app.celery_app beat -l info
-    env_file: ../.env
+    env_file: .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -104,12 +104,12 @@ services:
   # ─── Frontend React/Vite ───────────────────────────────────────────────────
   frontend:
     build:
-      context: ../frontend
+      context: ./frontend
       target: production
       args:
         VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY}
         VITE_API_BASE_URL: ${VITE_API_BASE_URL}
-    env_file: ../.env
+    env_file: .env
     ports:
       - "5173:5173"
     restart: unless-stopped
