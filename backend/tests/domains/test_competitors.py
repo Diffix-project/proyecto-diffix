@@ -125,3 +125,22 @@ class TestSchemaValidation:
         """Crear competidor sin website_url devuelve 422."""
         r = client.post(COMPETITOR_URL, json={"name": "Sin URL"})
         assert r.status_code == 422
+
+    def test_invalid_source_type_returns_422(self, client: TestClient, test_user):
+        """source_type inválido devuelve 422 (no 500 por IntegrityError de la DB)."""
+        payload = {
+            "name": "Con Fuente Invalida",
+            "website_url": "https://x.com",
+            "sources": [{"source_type": "facebook", "source_url": "https://x.com"}],
+        }
+        r = client.post(COMPETITOR_URL, json=payload)
+        assert r.status_code == 422
+
+    def test_add_source_invalid_type_returns_422(self, client: TestClient, test_user, db: Session):
+        """POST de una fuente con source_type inválido devuelve 422."""
+        comp = make_competitor(db, test_user.company, "Para Fuente")
+        r = client.post(
+            f"{COMPETITOR_URL}/{comp.id}/sources",
+            json={"source_type": "instagram", "source_url": "https://x.com"},
+        )
+        assert r.status_code == 422
