@@ -21,6 +21,7 @@ import {
   useDeleteCompetitor,
   useDeleteSource,
   useSources,
+  useUploadPdf,
 } from './api'
 
 const SOURCE_LABELS: Record<SourceType, string> = {
@@ -46,6 +47,7 @@ export default function CompetitorDetailPage() {
   const competitorQuery = useCompetitor(id)
   const sourcesQuery = useSources(id)
   const addSource = useAddSource(id)
+  const uploadPdf = useUploadPdf(id)
   const deleteSource = useDeleteSource(id)
   const deleteCompetitor = useDeleteCompetitor()
 
@@ -53,7 +55,16 @@ export default function CompetitorDetailPage() {
   const [showAddSource, setShowAddSource] = useState(false)
   const [newSourceType, setNewSourceType] = useState<SourceType>('website')
   const [newSourceUrl, setNewSourceUrl] = useState('')
+  const [newSourceFile, setNewSourceFile] = useState<File | null>(null)
   const [sourceError, setSourceError] = useState<string | null>(null)
+
+  function resetAddSourceState() {
+    setShowAddSource(false)
+    setNewSourceUrl('')
+    setNewSourceType('website')
+    setNewSourceFile(null)
+    setSourceError(null)
+  }
 
   function handleDeleteCompetitor() {
     deleteCompetitor.mutate(id, { onSuccess: () => navigate('/competitors') })
@@ -61,6 +72,17 @@ export default function CompetitorDetailPage() {
 
   function handleAddSource() {
     setSourceError(null)
+    if (newSourceType === 'pdf') {
+      if (!newSourceFile) {
+        setSourceError('Seleccioná un archivo PDF.')
+        return
+      }
+      uploadPdf.mutate(newSourceFile, {
+        onSuccess: resetAddSourceState,
+        onError: (error) => setSourceError(apiErrorMessage(error)),
+      })
+      return
+    }
     const url = newSourceUrl.trim()
     if (url && !isValidUrl(url)) {
       setSourceError('Ingresá una URL válida o dejala vacía.')
@@ -69,11 +91,7 @@ export default function CompetitorDetailPage() {
     addSource.mutate(
       { source_type: newSourceType, source_url: url || null },
       {
-        onSuccess: () => {
-          setShowAddSource(false)
-          setNewSourceUrl('')
-          setNewSourceType('website')
-        },
+        onSuccess: resetAddSourceState,
         onError: (error) => setSourceError(apiErrorMessage(error)),
       },
     )
@@ -168,17 +186,26 @@ export default function CompetitorDetailPage() {
       )}
 
       {/* Diálogo: agregar fuente */}
-      <Dialog open={showAddSource} onOpenChange={setShowAddSource}>
-        <DialogContent onClose={() => setShowAddSource(false)}>
+      <Dialog open={showAddSource} onOpenChange={(open) => { if (!open) resetAddSourceState() }}>
+        <DialogContent onClose={resetAddSourceState}>
           <DialogHeader>
             <DialogTitle>Agregar fuente</DialogTitle>
-            <DialogDescription>Elegí el tipo de fuente y, si aplica, su URL.</DialogDescription>
+            <DialogDescription>
+              {newSourceType === 'pdf'
+                ? 'Seleccioná el archivo PDF que querés subir.'
+                : 'Elegí el tipo de fuente y, si aplica, su URL.'}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <select
               value={newSourceType}
-              onChange={(e) => setNewSourceType(e.target.value as SourceType)}
-              className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
+              onChange={(e) => {
+                setNewSourceType(e.target.value as SourceType)
+                setNewSourceFile(null)
+                setNewSourceUrl('')
+                setSourceError(null)
+              }}
+              className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground"
             >
               {(Object.keys(SOURCE_LABELS) as SourceType[]).map((type) => (
                 <option key={type} value={type}>
@@ -186,20 +213,29 @@ export default function CompetitorDetailPage() {
                 </option>
               ))}
             </select>
-            <Input
-              type="url"
-              value={newSourceUrl}
-              onChange={(e) => setNewSourceUrl(e.target.value)}
-              placeholder="https://… (opcional)"
-            />
+            {newSourceType === 'pdf' ? (
+              <input
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={(e) => setNewSourceFile(e.target.files?.[0] ?? null)}
+                className="w-full text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground"
+              />
+            ) : (
+              <Input
+                type="url"
+                value={newSourceUrl}
+                onChange={(e) => setNewSourceUrl(e.target.value)}
+                placeholder="https://… (opcional)"
+              />
+            )}
             {sourceError && <p className="text-sm text-destructive">{sourceError}</p>}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddSource(false)}>
+            <Button variant="outline" onClick={resetAddSourceState}>
               Cancelar
             </Button>
-            <Button onClick={handleAddSource} disabled={addSource.isPending}>
-              {addSource.isPending ? 'Agregando…' : 'Agregar'}
+            <Button onClick={handleAddSource} disabled={addSource.isPending || uploadPdf.isPending}>
+              {addSource.isPending || uploadPdf.isPending ? 'Agregando…' : 'Agregar'}
             </Button>
           </DialogFooter>
         </DialogContent>

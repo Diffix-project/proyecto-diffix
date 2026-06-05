@@ -10,7 +10,7 @@ SaaS de inteligencia competitiva para distribuidoras argentinas. Monitorea compe
 **Auth:** Clerk. Storage: Cloudflare R2. Observabilidad LLM: Langfuse desde el día 1.  
 **Frontend:** React + TypeScript + Vite + TanStack Query + Zustand + Tailwind + shadcn/ui + React Router v7  
 **Servicios:** Resend (email) · Twilio (WhatsApp) · Mercado Pago · Railway (deploy)  
-**Dev:** `docker compose -f infra/docker-compose.yml up` levanta todo (API, worker, frontend, PostgreSQL, Redis, Langfuse)
+**Dev:** `docker compose up` levanta todo (API, worker, frontend, PostgreSQL, Redis, Langfuse)
 
 ## Arquitectura
 
