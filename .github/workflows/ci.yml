@@ -144,9 +144,12 @@ jobs:
       - name: Bandit — SAST
         run: bandit -r backend/app --severity-level medium --quiet
 
-      # Vulnerabilidades en dependencias Python
+      # Vulnerabilidades en dependencias Python.
+      # Actualizamos pip primero: pip-audit audita todo el entorno (incluido el
+      # propio pip), y la versión preinstalada en el runner puede tener CVEs.
       - name: pip-audit — dependencias Python
         run: |
+          python -m pip install --upgrade pip
           pip install -e "backend/.[dev]"
           pip-audit
 
