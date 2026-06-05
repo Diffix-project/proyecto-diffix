@@ -8,7 +8,7 @@ SaaS de inteligencia competitiva automatizada para distribuidoras argentinas. Mo
 cp .env.example .env
 # Editar .env con las variables reales (dejar USE_MOCKS=true para desarrollo sin credenciales)
 
-docker compose -f infra/docker-compose.yml up
+docker compose up
 ```
 
 Servicios disponibles:
