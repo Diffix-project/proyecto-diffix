@@ -31,7 +31,9 @@ def upload_pdf(
     Valida que el competidor pertenezca al usuario autenticado.
     """
     if user.company is None:
-        raise HTTPException(status_code=400, detail="El usuario no tiene empresa configurada.")
+        raise HTTPException(
+            status_code=400, detail="El usuario no tiene empresa configurada."
+        )
 
     competitor = (
         db.query(Competitor)
@@ -60,5 +62,15 @@ def upload_pdf(
 
     parse_pdf.delay(str(source.id), key)
 
-    logger.info("uploads: pdf registrado source=%s key=%s competitor=%s", source.id, key, competitor_id)
-    return {"key": key, "status": "encolado", "source_id": str(source.id), "competitor_id": str(competitor_id)}
+    logger.info(
+        "uploads: pdf registrado source=%s key=%s competitor=%s",
+        source.id,
+        key,
+        competitor_id,
+    )
+    return {
+        "key": key,
+        "status": "encolado",
+        "source_id": str(source.id),
+        "competitor_id": str(competitor_id),
+    }
