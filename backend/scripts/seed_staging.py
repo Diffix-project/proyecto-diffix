@@ -77,37 +77,61 @@ def seed(db) -> None:  # type: ignore[no-untyped-def]
     # ─── Competidores ─────────────────────────────────────────────────────────
 
     # free: max 2
-    comp_norte_1 = _upsert_competitor(db, user_free.company, "Alimentos del Sur", "https://alimentosdelsur.com.ar")
-    comp_norte_2 = _upsert_competitor(db, user_free.company, "Distribuidora Pampa", "https://distpampa.com.ar")
+    comp_norte_1 = _upsert_competitor(
+        db, user_free.company, "Alimentos del Sur", "https://alimentosdelsur.com.ar"
+    )
+    comp_norte_2 = _upsert_competitor(
+        db, user_free.company, "Distribuidora Pampa", "https://distpampa.com.ar"
+    )
 
     # growth: max 10, ponemos 4
-    comp_tech_1 = _upsert_competitor(db, user_growth.company, "TechSupply AR", "https://techsupply.com.ar")
-    comp_tech_2 = _upsert_competitor(db, user_growth.company, "Compuparts SRL", "https://compuparts.com.ar")
-    comp_tech_3 = _upsert_competitor(db, user_growth.company, "DigitalDist", "https://digitaldist.com.ar")
-    comp_tech_4 = _upsert_competitor(db, user_growth.company, "MercaTech", "https://mercatech.com.ar")
+    comp_tech_1 = _upsert_competitor(
+        db, user_growth.company, "TechSupply AR", "https://techsupply.com.ar"
+    )
+    comp_tech_2 = _upsert_competitor(
+        db, user_growth.company, "Compuparts SRL", "https://compuparts.com.ar"
+    )
+    comp_tech_3 = _upsert_competitor(
+        db, user_growth.company, "DigitalDist", "https://digitaldist.com.ar"
+    )
+    comp_tech_4 = _upsert_competitor(
+        db, user_growth.company, "MercaTech", "https://mercatech.com.ar"
+    )
 
     # starter: max 5, ponemos 3
-    comp_const_1 = _upsert_competitor(db, user_starter.company, "CementoPlus", "https://cementoplus.com.ar")
-    comp_const_2 = _upsert_competitor(db, user_starter.company, "Ferretería Central", "https://ferreteriacentral.com.ar")
-    comp_const_3 = _upsert_competitor(db, user_starter.company, "MateriaBuild", "https://materiabuild.com.ar")
+    comp_const_1 = _upsert_competitor(
+        db, user_starter.company, "CementoPlus", "https://cementoplus.com.ar"
+    )
+    comp_const_2 = _upsert_competitor(
+        db, user_starter.company, "Ferretería Central", "https://ferreteriacentral.com.ar"
+    )
+    comp_const_3 = _upsert_competitor(
+        db, user_starter.company, "MateriaBuild", "https://materiabuild.com.ar"
+    )
 
     db.commit()
     print("✓ Competidores")
 
     # ─── Fuentes ─────────────────────────────────────────────────────────────
 
-    src_norte_1_web = _upsert_source(db, comp_norte_1, "website", "https://alimentosdelsur.com.ar/precios")
+    src_norte_1_web = _upsert_source(
+        db, comp_norte_1, "website", "https://alimentosdelsur.com.ar/precios"
+    )
     src_norte_2_web = _upsert_source(db, comp_norte_2, "website", "https://distpampa.com.ar")
     _upsert_source(db, comp_norte_2, "mercadolibre", None, config={"seller_id": "12345678"})
 
     _upsert_source(db, comp_tech_1, "website", "https://techsupply.com.ar/catalogo")
     src_tech_1_jobs = _upsert_source(db, comp_tech_1, "jobs", "https://techsupply.com.ar/empleos")
-    src_tech_2_web  = _upsert_source(db, comp_tech_2, "website", "https://compuparts.com.ar")
+    src_tech_2_web = _upsert_source(db, comp_tech_2, "website", "https://compuparts.com.ar")
     _upsert_source(db, comp_tech_2, "mercadolibre", None, config={"seller_id": "87654321"})
-    src_tech_3_web  = _upsert_source(db, comp_tech_3, "website", "https://digitaldist.com.ar/precios")
+    src_tech_3_web = _upsert_source(
+        db, comp_tech_3, "website", "https://digitaldist.com.ar/precios"
+    )
     _upsert_source(db, comp_tech_4, "website", "https://mercatech.com.ar")
 
-    src_const_1_web = _upsert_source(db, comp_const_1, "website", "https://cementoplus.com.ar/lista-precios")
+    src_const_1_web = _upsert_source(
+        db, comp_const_1, "website", "https://cementoplus.com.ar/lista-precios"
+    )
     _upsert_source(db, comp_const_2, "website", "https://ferreteriacentral.com.ar")
     _upsert_source(db, comp_const_3, "website", "https://materiabuild.com.ar")
 
@@ -223,10 +247,14 @@ def _upsert_user(db, clerk_id, email, name, plan, company_name, industry):  # ty
 
 
 def _upsert_competitor(db, company, name, website_url):  # type: ignore[no-untyped-def]
-    comp = db.query(Competitor).filter(
-        Competitor.company_id == company.id,
-        Competitor.name == name,
-    ).first()
+    comp = (
+        db.query(Competitor)
+        .filter(
+            Competitor.company_id == company.id,
+            Competitor.name == name,
+        )
+        .first()
+    )
     if comp is None:
         comp = Competitor(company_id=company.id, name=name, website_url=website_url)
         db.add(comp)
@@ -235,10 +263,14 @@ def _upsert_competitor(db, company, name, website_url):  # type: ignore[no-untyp
 
 
 def _upsert_source(db, competitor, source_type, source_url, config=None):  # type: ignore[no-untyped-def]
-    src = db.query(CompetitorSource).filter(
-        CompetitorSource.competitor_id == competitor.id,
-        CompetitorSource.source_type == source_type,
-    ).first()
+    src = (
+        db.query(CompetitorSource)
+        .filter(
+            CompetitorSource.competitor_id == competitor.id,
+            CompetitorSource.source_type == source_type,
+        )
+        .first()
+    )
     if src is None:
         src = CompetitorSource(
             competitor_id=competitor.id,
@@ -252,12 +284,16 @@ def _upsert_source(db, competitor, source_type, source_url, config=None):  # typ
 
 
 def _upsert_change_only(db, competitor, source, section, diff_text, status, detected_at):  # type: ignore[no-untyped-def]
-    existing = db.query(Change).filter(
-        Change.competitor_id == competitor.id,
-        Change.source_id == source.id,
-        Change.section == section,
-        Change.status == status,
-    ).first()
+    existing = (
+        db.query(Change)
+        .filter(
+            Change.competitor_id == competitor.id,
+            Change.source_id == source.id,
+            Change.section == section,
+            Change.status == status,
+        )
+        .first()
+    )
     if existing:
         return existing
 
@@ -288,8 +324,17 @@ def _upsert_change_only(db, competitor, source, section, diff_text, status, dete
 
 
 def _upsert_change_with_insight(  # type: ignore[no-untyped-def]
-    db, competitor, source, section, diff_text, status, detected_at,
-    what_changed, why_it_matters, what_to_do, urgency,
+    db,
+    competitor,
+    source,
+    section,
+    diff_text,
+    status,
+    detected_at,
+    what_changed,
+    why_it_matters,
+    what_to_do,
+    urgency,
 ):
     change = _upsert_change_only(db, competitor, source, section, diff_text, status, detected_at)
 
