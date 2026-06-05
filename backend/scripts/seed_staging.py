@@ -27,11 +27,17 @@ os.environ.setdefault("CLERK_WEBHOOK_SECRET", "whsec_fake")
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-from app.domains.auth.models import Company, User
-from app.domains.changes.models import Change, Snapshot
-from app.domains.competitors.models import Competitor
-from app.domains.insights.models import Insight
-from app.domains.sources.models import CompetitorSource
+# Importar desde app.models registra los 7 modelos completos, así los mappers
+# resuelven todas las relaciones (ej.: User.notifications → Notification).
+from app.models import (
+    Change,
+    Company,
+    Competitor,
+    CompetitorSource,
+    Insight,
+    Snapshot,
+    User,
+)
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 
