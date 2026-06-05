@@ -31,9 +31,7 @@ def upload_pdf(
     Valida que el competidor pertenezca al usuario autenticado.
     """
     if user.company is None:
-        raise HTTPException(
-            status_code=400, detail="El usuario no tiene empresa configurada."
-        )
+        raise HTTPException(status_code=400, detail="El usuario no tiene empresa configurada.")
 
     competitor = (
         db.query(Competitor)
