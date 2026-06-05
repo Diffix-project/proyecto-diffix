@@ -1,0 +1,47 @@
+name: AI Documentation Updater
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'docs/**'
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Obtener lista de archivos cambiados
+        id: changed-files
+        uses: tj-actions/changed-files@v44
+
+      - name: Generar archivo Diff
+        run: git diff HEAD^ HEAD > diff.txt
+
+      - name: Preparar entorno Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Instalar dependencias
+        run: pip install google-generativeai
+
+      - name: Ejecutar script de IA dinámico
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        # Le pasamos la lista de archivos modificados separados por espacio como argumentos
+        run: python scripts/update_docs.py ${{ steps.changed-files.outputs.all_changed_files }}
+
+      - name: Crear Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "docs: actualización inteligente por Gemini"
+          title: "🤖 Actualización Dinámica de Documentación por IA"
+          body: "Gemini detectó cambios específicos en el código y reescribió únicamente los archivos .md correspondientes. Revisen el PR."
+          branch: auto-ai-docs
+          delete-branch: true
