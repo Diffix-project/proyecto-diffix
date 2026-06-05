@@ -34,8 +34,11 @@ jobs:
       - name: Ejecutar script de IA dinámico
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        # Le pasamos la lista de archivos modificados separados por espacio como argumentos
         run: python scripts/update_docs.py ${{ steps.changed-files.outputs.all_changed_files }}
+
+      - name: Limpiar archivo temporal Diff
+        # Este paso elimina el diff.txt del servidor para que el creador de PR no lo suba por error
+        run: rm -f diff.txt
 
       - name: Crear Pull Request
         uses: peter-evans/create-pull-request@v6
