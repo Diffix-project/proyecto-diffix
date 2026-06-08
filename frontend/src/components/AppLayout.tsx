@@ -19,7 +19,7 @@ export default function AppLayout() {
         <div className="h-14 flex items-center px-4 border-b">
           <span className="font-bold text-primary flex items-center gap-1">
             <BarChart2 className="h-5 w-5" />
-            vigi.ai
+            DiffiX
           </span>
         </div>
         <nav className="flex-1 py-4 px-2 space-y-1">
