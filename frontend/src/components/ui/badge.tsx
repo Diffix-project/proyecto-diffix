@@ -11,7 +11,7 @@ const badgeVariants = cva(
         secondary: 'border-transparent bg-secondary text-secondary-foreground',
         destructive: 'border-transparent bg-destructive text-destructive-foreground',
         outline: 'text-foreground',
-        // Urgencias vigi.ai
+        // Urgencias DiffiX
         alta: 'border-transparent bg-red-100 text-red-700',
         media: 'border-transparent bg-yellow-100 text-yellow-700',
         baja: 'border-transparent bg-gray-100 text-gray-600',
