@@ -24,9 +24,9 @@ jobs:
         run: git diff HEAD^ HEAD > diff.txt
 
       - name: Preparar entorno Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
 
       - name: Instalar dependencias
         run: pip install "google-genai==2.8.0"
