@@ -5,10 +5,17 @@ import time
 
 from google import genai
 
-MAX_DIFF_CHARS = 6000
+MAX_DIFF_CHARS = 3000
 MAX_RETRIES = 3
-RETRY_BASE_DELAY = 10
+RETRY_BASE_DELAY = 15
 API_CALL_DELAY = 5
+
+MODEL_FALLBACK_CHAIN = [
+    "gemini-1.5-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash-8b",
+    "gemini-2.0-flash",
+]
 
 
 def generate_with_retry(client, model, prompt, max_retries=MAX_RETRIES):
@@ -85,7 +92,22 @@ def extract_relevant_diff(full_diff, docs_path):
     return result
 
 
-MODEL = "gemini-2.0-flash"
+def try_generate(client, prompt):
+    last_error = None
+    for model in MODEL_FALLBACK_CHAIN:
+        try:
+            print(f"  Intentando con modelo {model}...")
+            response = generate_with_retry(client, model, prompt)
+            return response
+        except Exception as e:
+            error_str = str(e)
+            is_quota = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str
+            if is_quota:
+                print(f"  {model} sin quota disponible, probando siguiente...")
+                last_error = e
+                continue
+            raise
+    raise last_error
 
 
 def update_docs(client, full_diff, changed_files):
@@ -153,7 +175,7 @@ Reglas:
 """
 
         try:
-            response = generate_with_retry(client, MODEL, prompt)
+            response = try_generate(client, prompt)
             new_docs = response.text.strip()
 
             if new_docs.startswith("```markdown"):
