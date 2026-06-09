@@ -115,6 +115,13 @@ class TestExtractRelevantDiff(unittest.TestCase):
 
 
 class TestRetryLogic(unittest.TestCase):
+    def setUp(self):
+        self.orig_retry_delay = upd.RETRY_BASE_DELAY
+        upd.RETRY_BASE_DELAY = 1
+
+    def tearDown(self):
+        upd.RETRY_BASE_DELAY = self.orig_retry_delay
+
     def test_retry_on_429_fail_after_exhaustion(self):
         mock_client = MagicMock()
         mock_client.models.generate_content.side_effect = Exception(
@@ -124,7 +131,7 @@ class TestRetryLogic(unittest.TestCase):
         with self.assertRaises(Exception):
             upd.generate_with_retry(mock_client, "fake-model", "test prompt", max_retries=3)
         elapsed = time.time() - start
-        self.assertGreaterEqual(elapsed, 2.0)
+        self.assertGreaterEqual(elapsed, 3.0)
         self.assertEqual(mock_client.models.generate_content.call_count, 3)
 
     def test_retry_success_on_second_attempt(self):
