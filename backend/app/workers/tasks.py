@@ -11,7 +11,8 @@ Nombres exactos requeridos por celery_app.beat_schedule:
 
 import logging
 import uuid
-from datetime import UTC, datetime
+
+import sqlalchemy as sa
 
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
@@ -121,7 +122,7 @@ def scout_competitor(self, competitor_id: str):  # type: ignore[no-untyped-def]
                         "scout_competitor: fuente %s sin cambios (hash idéntico)",
                         source_id,
                     )
-                    source.last_checked_at = datetime.now(UTC)
+                    source.last_checked_at = sa.func.now()  # type: ignore[assignment]
                     db.commit()
                     continue
 
@@ -154,7 +155,7 @@ def scout_competitor(self, competitor_id: str):  # type: ignore[no-untyped-def]
                         source_id,
                     )
 
-                source.last_checked_at = datetime.now(UTC)
+                source.last_checked_at = sa.func.now()  # type: ignore[assignment]
                 db.commit()
 
             except NotImplementedError as exc:
