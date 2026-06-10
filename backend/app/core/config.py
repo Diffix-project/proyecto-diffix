@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     use_mocks: bool = True
 
     # ─── LLM ─────────────────────────────────────────────────────────────────
-    llm_model: str = "gemini/gemini-2.0-flash"
+    llm_model: str = "google/gemma-4-26b-a4b-it"
     gemini_api_key: str = ""
 
     # ─── Langfuse ────────────────────────────────────────────────────────────
