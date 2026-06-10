@@ -16,6 +16,7 @@ from app.integrations.scraper import fetch_clean_text
 def normalize_to_text(data) -> str:
     """Serializa dicts/lists a texto deterministico (sorted keys, indent fijo)."""
     import json
+
     return json.dumps(data, sort_keys=True, ensure_ascii=False, indent=2)
 
 
