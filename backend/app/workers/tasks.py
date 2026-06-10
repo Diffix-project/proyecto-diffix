@@ -10,6 +10,9 @@ Nombres exactos requeridos por celery_app.beat_schedule:
 """
 
 import logging
+import uuid
+
+import sqlalchemy as sa
 
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
@@ -54,17 +57,132 @@ def scout_competitor(self, competitor_id: str):  # type: ignore[no-untyped-def]
     Monitorea un competidor: obtiene estado de cada fuente, compara hash SHA256
     con el snapshot anterior y guarda un Change si hay diferencias significativas.
 
-    TODO (fase Scout): implementar lógica completa del Scout Agent:
-      - Llamar a integrations.scraper.fetch_clean_text para fuentes web
-      - Llamar a integrations.mercadolibre.get_seller_state para fuentes ML
-      - Llamar a integrations.apify.get_job_postings para fuentes de jobs
-      - Comparar hash SHA256 con snapshot anterior
-      - Guardar Snapshot + Change en DB si hay diff significativo
-      - Encolar analyze_change.delay(change_id) para cada Change nuevo
-      - Un error en una fuente NO debe detener el resto
+    Implementa el Scout Agent:
+      - Consulta fuentes activas del competidor
+      - Para cada fuente: fetch, hash, compare, snapshot, change
+      - Aislamiento de errores: un fallo en una fuente no detiene las demás
+      - Encola analyze_change para cada Change nuevo
     """
-    logger.info("scout_competitor [placeholder] competitor_id=%s", competitor_id)
-    # TODO: fase Scout
+    from app.agents.scout.core import (  # noqa: PLC0415
+        compute_diff,
+        compute_hash,
+        create_change,
+        create_snapshot,
+        detect_section,
+        fetch_source_content,
+        get_last_snapshot,
+    )
+    from app.domains.competitors.models import Competitor  # noqa: PLC0415
+    from app.domains.sources.models import CompetitorSource  # noqa: PLC0415
+
+    db = SessionLocal()
+    try:
+        comp_uuid = uuid.UUID(competitor_id)
+        competitor = db.query(Competitor).filter(Competitor.id == comp_uuid).first()
+        if not competitor:
+            logger.warning("scout_competitor: competidor %s no encontrado", competitor_id)
+            return
+
+        if not competitor.is_active:
+            logger.info("scout_competitor: competidor %s inactivo, saltando", competitor_id)
+            return
+
+        competitor_name = competitor.name
+
+        sources = (
+            db.query(CompetitorSource)
+            .filter(
+                CompetitorSource.competitor_id == competitor.id,
+                CompetitorSource.is_active.is_(True),
+            )
+            .all()
+        )
+
+        if not sources:
+            logger.info("scout_competitor: competidor %s sin fuentes activas", competitor_id)
+            return
+
+        logger.info(
+            "scout_competitor: procesando %d fuentes de competidor %s",
+            len(sources),
+            competitor_name,
+        )
+
+        source_data = [(s.id, s.source_type) for s in sources]
+
+        for source_id, source_type in source_data:
+            try:
+                source = db.query(CompetitorSource).filter(CompetitorSource.id == source_id).one()
+                content = fetch_source_content(source)
+                content_hash = compute_hash(content)
+                last_snapshot = get_last_snapshot(db, source_id)
+
+                if last_snapshot and last_snapshot.content_hash == content_hash:
+                    logger.debug(
+                        "scout_competitor: fuente %s sin cambios (hash idéntico)",
+                        source_id,
+                    )
+                    source.last_checked_at = sa.func.now()  # type: ignore[assignment]
+                    db.commit()
+                    continue
+
+                new_snapshot = create_snapshot(db, source, content, content_hash)
+
+                if last_snapshot:
+                    diff_text, diff_raw = compute_diff(last_snapshot.content, content)
+                    section = detect_section(source_type, content)
+                    change = create_change(
+                        db,
+                        source,
+                        last_snapshot,
+                        new_snapshot,
+                        diff_text,
+                        diff_raw,
+                        section,
+                    )
+                    db.commit()
+
+                    analyze_change.delay(str(change.id))
+                    logger.info(
+                        "scout_competitor: cambio detectado en fuente %s, change_id=%s",
+                        source_id,
+                        change.id,
+                    )
+                else:
+                    db.commit()
+                    logger.info(
+                        "scout_competitor: primer snapshot para fuente %s",
+                        source_id,
+                    )
+
+                source.last_checked_at = sa.func.now()  # type: ignore[assignment]
+                db.commit()
+
+            except NotImplementedError as exc:
+                logger.warning(
+                    "scout_competitor: fuente %s no implementada (%s), saltando",
+                    source_id,
+                    exc,
+                )
+                db.rollback()
+                continue
+            except Exception as exc:
+                logger.error(
+                    "scout_competitor: error procesando fuente %s: %s",
+                    source_id,
+                    exc,
+                    exc_info=True,
+                )
+                db.rollback()
+                continue
+
+        logger.info("scout_competitor: competidor %s procesado correctamente", competitor_name)
+
+    except Exception as exc:
+        logger.error("scout_competitor: error inesperado: %s", exc, exc_info=True)
+        raise
+    finally:
+        db.close()
 
 
 @celery_app.task(name="app.workers.tasks.analyze_change", bind=True)
