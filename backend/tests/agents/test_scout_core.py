@@ -13,7 +13,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.agents.scout.core import compute_hash, fetch_source_content, normalize_to_text
+from app.agents.scout.core import compute_hash, fetch_source_content
+from app.agents.scout.strategies import normalize_to_text
 
 
 class TestComputeHash:
@@ -64,7 +65,7 @@ class TestNormalizeToText:
 
 
 class TestFetchSourceContentWebsite:
-    @patch("app.agents.scout.core.fetch_clean_text")
+    @patch("app.agents.scout.strategies.fetch_clean_text")
     def test_calls_scraper_with_url(self, mock_scraper):
         mock_scraper.return_value = "texto de la pagina"
         source = MagicMock()
@@ -88,7 +89,7 @@ class TestFetchSourceContentWebsite:
 
 
 class TestFetchSourceContentMercadolibre:
-    @patch("app.agents.scout.core.get_seller_state")
+    @patch("app.agents.scout.strategies.get_seller_state")
     def test_calls_ml_api_with_seller_id_from_config(self, mock_ml):
         mock_ml.return_value = {"seller_id": "123", "reputation": "good"}
         source = MagicMock()
@@ -103,7 +104,7 @@ class TestFetchSourceContentMercadolibre:
         parsed = json.loads(result)
         assert parsed["seller_id"] == "123"
 
-    @patch("app.agents.scout.core.get_seller_state")
+    @patch("app.agents.scout.strategies.get_seller_state")
     def test_falls_back_to_source_url_if_no_config(self, mock_ml):
         mock_ml.return_value = {"seller_id": "456"}
         source = MagicMock()
@@ -129,7 +130,7 @@ class TestFetchSourceContentMercadolibre:
 
 
 class TestFetchSourceContentJobs:
-    @patch("app.agents.scout.core.get_job_postings")
+    @patch("app.agents.scout.strategies.get_job_postings")
     def test_calls_apify_with_competitor_name(self, mock_apify):
         mock_apify.return_value = [{"title": "Dev", "company": "Comp"}]
         competitor = MagicMock()
@@ -146,7 +147,7 @@ class TestFetchSourceContentJobs:
         parsed = json.loads(result)
         assert len(parsed) == 1
 
-    @patch("app.agents.scout.core.get_job_postings")
+    @patch("app.agents.scout.strategies.get_job_postings")
     def test_respects_since_days_from_config(self, mock_apify):
         mock_apify.return_value = []
         competitor = MagicMock()
@@ -195,7 +196,7 @@ class TestFetchSourceContentInvalid:
 class TestIntegrationHashConsistency:
     """Verifica que el contenido normalizado produce hashes consistentes."""
 
-    @patch("app.agents.scout.core.get_seller_state")
+    @patch("app.agents.scout.strategies.get_seller_state")
     def test_same_data_same_hash(self, mock_ml):
         mock_ml.return_value = {"seller_id": "123", "reputation": "good"}
         source = MagicMock()

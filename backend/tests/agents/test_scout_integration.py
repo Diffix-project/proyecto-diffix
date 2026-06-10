@@ -38,7 +38,7 @@ class TestScoutEndToEnd:
 
         with (
             patch("app.workers.tasks.SessionLocal") as mock_session_local,
-            patch("app.agents.scout.core.fetch_clean_text") as mock_fetch,
+            patch("app.agents.scout.strategies.fetch_clean_text") as mock_fetch,
             patch("app.workers.tasks.analyze_change") as mock_analyze,
             patch("app.workers.tasks.scout_competitor") as mock_scout,
         ):
@@ -103,7 +103,7 @@ class TestScoutEndToEnd:
 
         with (
             patch("app.workers.tasks.SessionLocal") as mock_session_local,
-            patch("app.agents.scout.core.fetch_clean_text") as mock_fetch,
+            patch("app.agents.scout.strategies.fetch_clean_text") as mock_fetch,
             patch("app.workers.tasks.analyze_change") as mock_analyze,
         ):
             mock_session_local.return_value = db
@@ -170,7 +170,7 @@ class TestScoutEndToEnd:
 
         with (
             patch("app.workers.tasks.SessionLocal") as mock_session_local,
-            patch("app.agents.scout.core.fetch_clean_text") as mock_fetch,
+            patch("app.agents.scout.strategies.fetch_clean_text") as mock_fetch,
         ):
             mock_session_local.return_value = db
             mock_fetch.return_value = content

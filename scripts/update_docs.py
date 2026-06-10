@@ -11,10 +11,7 @@ RETRY_BASE_DELAY = 15
 API_CALL_DELAY = 5
 
 MODEL_FALLBACK_CHAIN = [
-    "gemini-1.5-flash",
-    "gemini-2.0-flash-lite",
-    "gemini-1.5-flash-8b",
-    "gemini-2.0-flash",
+    "gemma-4-26b-a4b-it",
 ]
 
 

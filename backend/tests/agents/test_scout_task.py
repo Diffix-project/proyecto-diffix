@@ -41,8 +41,8 @@ class TestScoutCompetitorTask:
 
         with (
             patch("app.workers.tasks.SessionLocal") as mock_session_local,
-            patch("app.agents.scout.core.fetch_clean_text") as mock_scraper,
-            patch("app.agents.scout.core.get_seller_state") as mock_ml,
+            patch("app.agents.scout.strategies.fetch_clean_text") as mock_scraper,
+            patch("app.agents.scout.strategies.get_seller_state") as mock_ml,
         ):
             mock_session_local.return_value = db
             mock_scraper.return_value = "content"
@@ -68,7 +68,7 @@ class TestScoutCompetitorTask:
 
         with (
             patch("app.workers.tasks.SessionLocal") as mock_session_local,
-            patch("app.agents.scout.core.fetch_clean_text") as mock_fetch,
+            patch("app.agents.scout.strategies.fetch_clean_text") as mock_fetch,
         ):
             mock_session_local.return_value = db
 
@@ -105,7 +105,7 @@ class TestScoutCompetitorTask:
 
         with (
             patch("app.workers.tasks.SessionLocal") as mock_session_local,
-            patch("app.agents.scout.core.fetch_clean_text") as mock_fetch,
+            patch("app.agents.scout.strategies.fetch_clean_text") as mock_fetch,
         ):
             mock_session_local.return_value = db
             mock_fetch.return_value = "content"
@@ -151,7 +151,7 @@ class TestScoutCompetitorTask:
 
         with (
             patch("app.workers.tasks.SessionLocal") as mock_session_local,
-            patch("app.agents.scout.core.fetch_clean_text") as mock_fetch,
+            patch("app.agents.scout.strategies.fetch_clean_text") as mock_fetch,
             patch("app.workers.tasks.analyze_change") as mock_analyze,
         ):
             mock_session_local.return_value = db
@@ -206,7 +206,7 @@ class TestScoutCompetitorTask:
 
         with (
             patch("app.workers.tasks.SessionLocal") as mock_session_local,
-            patch("app.agents.scout.core.fetch_clean_text") as mock_fetch,
+            patch("app.agents.scout.strategies.fetch_clean_text") as mock_fetch,
             patch("app.workers.tasks.analyze_change") as mock_analyze,
         ):
             mock_session_local.return_value = db
@@ -244,7 +244,7 @@ class TestScoutCompetitorTask:
 
         with (
             patch("app.workers.tasks.SessionLocal") as mock_session_local,
-            patch("app.agents.scout.core.fetch_clean_text") as mock_scraper,
+            patch("app.agents.scout.strategies.fetch_clean_text") as mock_scraper,
         ):
             mock_session_local.return_value = db
             mock_scraper.side_effect = ValueError("Error simulado")
@@ -279,7 +279,7 @@ class TestScoutCompetitorTask:
 
         with (
             patch("app.workers.tasks.SessionLocal") as mock_session_local,
-            patch("app.agents.scout.core.fetch_clean_text") as mock_fetch,
+            patch("app.agents.scout.strategies.fetch_clean_text") as mock_fetch,
         ):
             mock_session_local.return_value = db
             mock_fetch.return_value = "content"
