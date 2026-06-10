@@ -11,7 +11,7 @@ RETRY_BASE_DELAY = 15
 API_CALL_DELAY = 5
 
 MODEL_FALLBACK_CHAIN = [
-    "gemma-3-27b-it",
+    "gemma-4-26b-a4b-it",
 ]
 
 

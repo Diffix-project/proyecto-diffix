@@ -353,7 +353,7 @@ def _upsert_change_with_insight(  # type: ignore[no-untyped-def]
         why_it_matters=why_it_matters,
         what_to_do=what_to_do,
         urgency=urgency,
-        llm_model="google/gemma-3-27b-it",
+        llm_model="google/gemma-4-26b-a4b-it",
         prompt_tokens=420,
         completion_tokens=180,
         generated_at=detected_at + timedelta(seconds=12),
