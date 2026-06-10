@@ -47,7 +47,7 @@ class TestGetLastSnapshot:
         db.add(source)
         db.flush()
 
-        from datetime import datetime, timedelta, UTC
+        from datetime import UTC, datetime, timedelta
 
         now = datetime.now(UTC)
         snap1 = Snapshot(
