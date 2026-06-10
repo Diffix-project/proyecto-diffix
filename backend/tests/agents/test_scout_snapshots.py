@@ -47,9 +47,9 @@ class TestGetLastSnapshot:
         db.add(source)
         db.flush()
 
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta, UTC
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         snap1 = Snapshot(
             competitor_id=competitor.id,
             source_id=source.id,
