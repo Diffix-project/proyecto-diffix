@@ -62,9 +62,7 @@ def fetch_source_content(source: CompetitorSource) -> str:
     if source_type == "mercadolibre":
         seller_id = config.get("seller_id") or source.source_url
         if not seller_id:
-            raise ValueError(
-                f"Fuente mercadolibre sin seller_id en config (source_id={source.id})"
-            )
+            raise ValueError(f"Fuente mercadolibre sin seller_id en config (source_id={source.id})")
         data = get_seller_state(seller_id)
         return normalize_to_text(data)
 

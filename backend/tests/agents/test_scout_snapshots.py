@@ -47,12 +47,16 @@ class TestGetLastSnapshot:
         db.add(source)
         db.flush()
 
+        from datetime import datetime, timedelta, timezone
+
+        now = datetime.now(timezone.utc)
         snap1 = Snapshot(
             competitor_id=competitor.id,
             source_id=source.id,
             source_type="website",
             content_hash="aaa",
             content="old",
+            captured_at=now - timedelta(seconds=1),
         )
         snap2 = Snapshot(
             competitor_id=competitor.id,
@@ -60,6 +64,7 @@ class TestGetLastSnapshot:
             source_type="website",
             content_hash="bbb",
             content="new",
+            captured_at=now,
         )
         db.add_all([snap1, snap2])
         db.flush()
