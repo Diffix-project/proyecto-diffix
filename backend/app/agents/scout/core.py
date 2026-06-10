@@ -16,25 +16,16 @@ deterministicos entre corridas con los mismos datos.
 
 import difflib
 import hashlib
-import json
 import logging
 from datetime import UTC, datetime
-from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.agents.scout.strategies import get_strategy
 from app.domains.changes.models import Change, Snapshot
 from app.domains.sources.models import CompetitorSource
-from app.integrations.apify import get_job_postings
-from app.integrations.mercadolibre import get_seller_state
-from app.integrations.scraper import fetch_clean_text
 
 logger = logging.getLogger(__name__)
-
-
-def normalize_to_text(data: Any) -> str:
-    """Serializa dicts/lists a texto deterministico (sorted keys, indent fijo)."""
-    return json.dumps(data, sort_keys=True, ensure_ascii=False, indent=2)
 
 
 def compute_hash(content: str) -> str:
@@ -46,38 +37,10 @@ def fetch_source_content(source: CompetitorSource) -> str:
     """
     Obtiene el contenido de una fuente segun su tipo.
 
-    - website: scraping con Playwright (mock en dev)
-    - mercadolibre: API oficial de ML (mock en dev)
-    - jobs: Apify para LinkedIn Jobs (mock en dev)
-    - pdf: no implementado en este milestone
+    Delega a la estrategia correspondiente via Strategy pattern.
     """
-    source_type = source.source_type
-    config = source.config or {}
-
-    if source_type == "website":
-        if not source.source_url:
-            raise ValueError(f"Fuente website sin source_url (source_id={source.id})")
-        return fetch_clean_text(source.source_url)
-
-    if source_type == "mercadolibre":
-        seller_id = config.get("seller_id") or source.source_url
-        if not seller_id:
-            raise ValueError(f"Fuente mercadolibre sin seller_id en config (source_id={source.id})")
-        data = get_seller_state(seller_id)
-        return normalize_to_text(data)
-
-    if source_type == "jobs":
-        competitor = source.competitor
-        if not competitor:
-            raise ValueError(f"Fuente jobs sin competidor asociado (source_id={source.id})")
-        since_days = config.get("since_days", 30)
-        postings = get_job_postings(competitor.name, since_days=since_days)
-        return normalize_to_text(postings)
-
-    if source_type == "pdf":
-        raise NotImplementedError("Fuente pdf: pendiente de implementar")
-
-    raise ValueError(f"source_type desconocido: {source_type!r} (source_id={source.id})")
+    strategy = get_strategy(source.source_type)
+    return strategy.fetch(source)
 
 
 def get_last_snapshot(db: Session, source_id) -> Snapshot | None:
@@ -152,27 +115,14 @@ def detect_section(source_type: str, content: str) -> str:
     """
     Determina la seccion del cambio basada en source_type y contenido.
 
-    - jobs -> "jobs"
-    - mercadolibre -> "pricing"
-    - pdf -> "pdf"
-    - website -> heuristica por keywords o "general"
+    Delega a la estrategia correspondiente via Strategy pattern.
+    Si el tipo es desconocido, retorna "general".
     """
-    if source_type == "jobs":
-        return "jobs"
-    if source_type == "mercadolibre":
-        return "pricing"
-    if source_type == "pdf":
-        return "pdf"
-
-    if source_type == "website":
-        content_lower = content.lower()
-        if any(word in content_lower for word in ["precio", "price", "$", "tarifa"]):
-            return "pricing"
-        if any(word in content_lower for word in ["producto", "catalogo", "item"]):
-            return "features"
+    try:
+        strategy = get_strategy(source_type)
+    except ValueError:
         return "general"
-
-    return "general"
+    return strategy.detect_section(content)
 
 
 def create_change(
