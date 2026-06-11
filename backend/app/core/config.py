@@ -21,6 +21,15 @@ class Settings(BaseSettings):
     # ─── Flags de desarrollo ──────────────────────────────────────────────────
     use_mocks: bool = True
 
+    # ─── Scraper (Playwright) ─────────────────────────────────────────────────
+    # Timeout de navegación en ms (page.goto). Env: SCRAPER_TIMEOUT_MS.
+    scraper_timeout_ms: int = 30000
+    # User-agent realista de Chrome desktop para reducir detección de bots.
+    scraper_user_agent: str = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    )
+
     # ─── LLM ─────────────────────────────────────────────────────────────────
     llm_model: str = "google/gemma-4-26b-a4b-it"
     gemini_api_key: str = ""
