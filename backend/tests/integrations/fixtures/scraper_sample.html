@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Distribuidora XYZ</title>
+  </head>
+  <body>
+    <header>
+      <h1>Distribuidora XYZ S.A.</h1>
+    </header>
+
+    <!-- Ruido: banner de cookies (debe eliminarse al limpiar) -->
+    <div class="cookie-banner">
+      Usamos cookies para mejorar tu experiencia. Aceptar todas las cookies
+    </div>
+
+    <main>
+      <p>Precios vigentes desde el 01/06/2026.</p>
+      <ul id="precios">
+        <li>Producto A: $1.200</li>
+        <li>Producto B: $3.500</li>
+      </ul>
+
+      <!-- Ruido dinámico: timestamps relativos y contadores (deben eliminarse) -->
+      <p class="meta">Publicado hace 3 minutos</p>
+      <p class="meta">1.234 visitas</p>
+      <p class="meta">updated 2 hours ago</p>
+    </main>
+
+    <!-- Contenido agregado por JS: verifica que se espera la hidratación (networkidle) -->
+    <script>
+      var li = document.createElement("li");
+      li.textContent = "Producto C: $800";
+      document.getElementById("precios").appendChild(li);
+    </script>
+  </body>
+</html>

@@ -10,15 +10,38 @@ Cubre la implementación de fetch_clean_text con la API síncrona de Playwright:
 Playwright se mockea por completo: los tests no abren un browser ni tocan la red.
 """
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import sync_playwright
 
+from app.agents.scout.core import compute_hash
 from app.core.config import settings
 from app.integrations import scraper
 from app.integrations.scraper import ScraperError, clean_scraped_text, fetch_clean_text
+
+_FIXTURE_HTML = Path(__file__).parent / "fixtures" / "scraper_sample.html"
+
+
+def _chromium_available() -> bool:
+    """True si el browser Chromium de Playwright está instalado y puede arrancar.
+
+    Permite auto-skipear los tests de browser real en CI (que corre hermético, sin
+    browser instalado) sin romper la suite.
+    """
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            browser.close()
+        return True
+    except Exception:
+        return False
+
+
+_CHROMIUM_AVAILABLE = _chromium_available()
 
 
 def _response(status: int = 200) -> MagicMock:
@@ -196,6 +219,49 @@ class TestErrorHandling:
     def test_scraper_error_is_exception_subclass(self):
         # El Scout captura Exception por fuente; ScraperError debe ser capturable así.
         assert issubclass(ScraperError, Exception)
+
+
+@pytest.mark.skipif(
+    not _CHROMIUM_AVAILABLE,
+    reason="Chromium de Playwright no instalado (CI hermético): correr `playwright install chromium`",
+)
+class TestRealBrowserStability:
+    """Tests end-to-end con Chromium real sobre un fixture HTML local (file://).
+
+    No tocan la red. Se auto-skipean si el browser no está instalado, manteniendo
+    el CI hermético. Verifican la estabilidad del hash (DIX-26) de punta a punta.
+    """
+
+    @pytest.fixture()
+    def fixture_url(self) -> str:
+        return _FIXTURE_HTML.as_uri()
+
+    def test_returns_non_empty_text(self, fixture_url, real_mode):
+        result = fetch_clean_text(fixture_url)
+        assert result.strip()
+        assert "Distribuidora XYZ" in result
+
+    def test_extracts_js_rendered_content(self, fixture_url, real_mode):
+        # "Producto C: $800" se agrega por JS: prueba que se espera la hidratación.
+        result = fetch_clean_text(fixture_url)
+        assert "Producto C: $800" in result
+
+    def test_stable_across_runs(self, fixture_url, real_mode):
+        first = fetch_clean_text(fixture_url)
+        second = fetch_clean_text(fixture_url)
+        assert first == second
+        assert compute_hash(first) == compute_hash(second)
+
+    def test_noise_removed_from_real_page(self, fixture_url, real_mode):
+        result = fetch_clean_text(fixture_url)
+        # Contenido relevante conservado.
+        assert "Producto A: $1.200" in result
+        assert "Producto B: $3.500" in result
+        # Ruido dinámico eliminado.
+        assert "hace 3 minutos" not in result
+        assert "1.234 visitas" not in result
+        assert "2 hours ago" not in result
+        assert "cookie" not in result.lower()
 
 
 class TestCleanScrapedText:
