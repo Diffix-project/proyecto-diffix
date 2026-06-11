@@ -10,6 +10,7 @@ el texto visible, luego lo limpia para que el hash sea determinista entre re-run
 """
 
 import logging
+import re
 
 from playwright.sync_api import sync_playwright
 
@@ -25,20 +26,70 @@ _MOCK_TEXT = (
     "Contacto: ventas@ejemplo.com.ar"
 )
 
+# ─── Patrones de ruido dinámico (regex compilados para performance) ───────────
+# El objetivo es que el hash del texto sea determinista entre re-runs: se
+# eliminan líneas cuyo contenido cambia solo por el paso del tiempo (timestamps
+# relativos, contadores) o que son chrome del sitio (banners de cookies).
+
+# Timestamps relativos ES/EN. Si aparecen en cualquier parte de la línea, esa
+# línea es volátil entre re-runs → se elimina entera.
+_RELATIVE_TIMESTAMP_RE = re.compile(
+    r"\bhace\s+(un[oa]?|\d[\d.,]*)\s+(segundo|minuto|hora|d[ií]a|semana|mes|a[ñn]o)s?\b"
+    r"|\bhace\s+(un\s+momento|instantes|unos\s+segundos)\b"
+    r"|\b\d[\d.,]*\s+(second|minute|hour|day|week|month|year)s?\s+ago\b"
+    r"|\b(updated|posted|published|publicado|actualizado)\b[^\n]*\bago\b"
+    r"|\bjust\s+now\b|\bahora\s+mismo\b",
+    re.IGNORECASE,
+)
+
+# Palabras de contadores dinámicos (vistas, comentarios, compartidos, etc.).
+_COUNTER_WORDS = (
+    r"(?:visitas?|vistas?|reproducciones|comentarios?|compartid[oa]s?|me\s+gusta"
+    r"|reacciones|seguidores|likes?|views?|comments?|shares?|reactions?|followers?)"
+)
+# Contadores: solo se elimina la línea si es esencialmente el contador (anclado a
+# inicio/fin de línea) para no descartar contenido relevante que mencione números.
+_COUNTER_RE = re.compile(
+    rf"^[\d.,]+\s+{_COUNTER_WORDS}$"
+    rf"|^{_COUNTER_WORDS}:?\s+[\d.,]+$"
+    rf"|^(?:shared|compartido)\s+[\d.,]+\s+(?:times|veces)$",
+    re.IGNORECASE,
+)
+
+# Banners de cookies / consentimiento.
+_COOKIE_RE = re.compile(
+    r"\bcookies?\b|\bconsentimiento\b|\bconsent\b"
+    r"|\bpol[ií]tica de (cookies|privacidad)\b"
+    r"|\bpreferencias de (cookies|privacidad)\b"
+    r"|\bgestionar cookies\b|\bwe use cookies\b",
+    re.IGNORECASE,
+)
+
+
+def _is_noise(line: str) -> bool:
+    """True si la línea es ruido dinámico (timestamp, contador o cookie banner)."""
+    return bool(
+        _RELATIVE_TIMESTAMP_RE.search(line) or _COUNTER_RE.search(line) or _COOKIE_RE.search(line)
+    )
+
 
 def clean_scraped_text(raw_text: str) -> str:
     """
-    Normaliza el texto extraído para que sea determinista.
+    Limpia el texto extraído para que el hash sea determinista entre re-runs.
 
-    En esta etapa (DIX-23) sólo normaliza whitespace: colapsa espacios múltiples,
-    hace trim por línea y elimina líneas vacías consecutivas. La eliminación de
-    ruido dinámico (timestamps, contadores) se implementa en DIX-24 sobre este hook.
+    - Normaliza whitespace: colapsa espacios múltiples y hace trim por línea.
+    - Elimina líneas de ruido dinámico (timestamps relativos, contadores) y
+      banners de cookies/consentimiento.
+    - Colapsa líneas vacías consecutivas.
+
+    Es una función pura y determinista: misma entrada → misma salida.
     """
-    lines = [" ".join(line.split()) for line in raw_text.splitlines()]
-
     cleaned: list[str] = []
     prev_blank = False
-    for line in lines:
+    for raw_line in raw_text.splitlines():
+        line = " ".join(raw_line.split())
+        if line and _is_noise(line):
+            continue
         is_blank = line == ""
         if is_blank and prev_blank:
             continue

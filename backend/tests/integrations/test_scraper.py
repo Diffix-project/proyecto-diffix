@@ -121,3 +121,85 @@ class TestCleanScrapedText:
 
     def test_empty_input(self):
         assert clean_scraped_text("") == ""
+
+
+class TestCleanScrapedTextNoise:
+    @pytest.mark.parametrize(
+        "noise_line",
+        [
+            "hace 3 minutos",
+            "hace 5 días",
+            "hace un momento",
+            "hace 2 años",
+            "updated 2 hours ago",
+            "Posted 5 days ago",
+            "just now",
+            "ahora mismo",
+        ],
+    )
+    def test_removes_relative_timestamps(self, noise_line):
+        raw = f"Contenido relevante\n{noise_line}\nMás contenido"
+        result = clean_scraped_text(raw)
+        assert result == "Contenido relevante\nMás contenido"
+
+    @pytest.mark.parametrize(
+        "noise_line",
+        [
+            "1.234 visitas",
+            "56 vistas",
+            "120 me gusta",
+            "shared 56 times",
+            "compartido 12 veces",
+            "comentarios: 45",
+            "9 comentarios",
+            "1,234 views",
+        ],
+    )
+    def test_removes_dynamic_counters(self, noise_line):
+        raw = f"Producto A: $1.200\n{noise_line}\nProducto B: $3.500"
+        result = clean_scraped_text(raw)
+        assert result == "Producto A: $1.200\nProducto B: $3.500"
+
+    @pytest.mark.parametrize(
+        "noise_line",
+        [
+            "Usamos cookies para mejorar tu experiencia",
+            "Aceptar todas las cookies",
+            "Política de cookies",
+            "Gestionar cookies",
+            "We use cookies to improve your experience",
+            "Gestionar el consentimiento",
+        ],
+    )
+    def test_removes_cookie_banners(self, noise_line):
+        raw = f"Bienvenidos\n{noise_line}\nProducto A: $1.200"
+        result = clean_scraped_text(raw)
+        assert result == "Bienvenidos\nProducto A: $1.200"
+
+    def test_keeps_relevant_content_with_numbers(self):
+        # Líneas con números que NO son contadores no deben eliminarse.
+        raw = (
+            "Producto A: $1.200 | Producto B: $3.500\n"
+            "Entrega: 48hs hábiles en AMBA\n"
+            "Precios vigentes desde el 01/06/2026"
+        )
+        assert clean_scraped_text(raw) == raw
+
+    def test_does_not_remove_me_gusta_in_sentence(self):
+        # "me gusta" dentro de una oración (no como contador) se conserva.
+        raw = "Me gusta este producto porque rinde mucho"
+        assert clean_scraped_text(raw) == raw
+
+    def test_noise_removal_is_deterministic(self):
+        raw = "Oferta\nhace 3 minutos\n1.234 visitas\nProducto A: $100"
+        assert clean_scraped_text(raw) == clean_scraped_text(raw)
+        assert clean_scraped_text(raw) == "Oferta\nProducto A: $100"
+
+    def test_mock_text_survives_cleaning(self):
+        # El texto mock no debe perder líneas relevantes al limpiarse.
+        from app.integrations.scraper import _MOCK_TEXT
+
+        cleaned = clean_scraped_text(_MOCK_TEXT)
+        assert "Distribuidora Ejemplo" in cleaned
+        assert "Producto A: $1.200" in cleaned
+        assert "ventas@ejemplo.com.ar" in cleaned
