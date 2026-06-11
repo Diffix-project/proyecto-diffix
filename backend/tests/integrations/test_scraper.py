@@ -13,18 +13,35 @@ Playwright se mockea por completo: los tests no abren un browser ni tocan la red
 from unittest.mock import MagicMock, patch
 
 import pytest
+from playwright.sync_api import Error as PlaywrightError
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from app.core.config import settings
 from app.integrations import scraper
-from app.integrations.scraper import clean_scraped_text, fetch_clean_text
+from app.integrations.scraper import ScraperError, clean_scraped_text, fetch_clean_text
 
 
-def _build_playwright_mock(inner_text: str = "texto del body", *, goto_side_effect=None):
+def _response(status: int = 200) -> MagicMock:
+    resp = MagicMock(name="response")
+    resp.status = status
+    return resp
+
+
+def _build_playwright_mock(
+    inner_text: str = "texto del body",
+    *,
+    status: int = 200,
+    goto_side_effect=None,
+    has_captcha: bool = False,
+):
     """Arma el árbol de mocks que devuelve sync_playwright() como context manager."""
     page = MagicMock(name="page")
     page.inner_text.return_value = inner_text
     if goto_side_effect is not None:
         page.goto.side_effect = goto_side_effect
+    else:
+        page.goto.return_value = _response(status)
+    page.query_selector.return_value = MagicMock(name="captcha") if has_captcha else None
 
     context = MagicMock(name="context")
     context.new_page.return_value = page
@@ -47,6 +64,13 @@ def real_mode():
     """Fuerza settings.use_mocks=False sólo durante el test."""
     with patch.object(settings, "use_mocks", False):
         yield
+
+
+@pytest.fixture()
+def no_sleep():
+    """Evita esperas reales de backoff durante los tests de retry."""
+    with patch.object(scraper.time, "sleep") as mock_sleep:
+        yield mock_sleep
 
 
 class TestMockMode:
@@ -100,6 +124,78 @@ class TestRealMode:
         with patch.object(scraper, "sync_playwright", cm):
             result = fetch_clean_text("https://competidor.com")
         assert result == "Producto A\n\nProducto B"
+
+
+class TestErrorHandling:
+    def test_timeout_retries_then_raises_scraper_error(self, real_mode, no_sleep):
+        cm, _browser, _context, page = _build_playwright_mock(
+            goto_side_effect=PlaywrightTimeoutError("timeout")
+        )
+        with patch.object(scraper, "sync_playwright", cm):
+            with pytest.raises(ScraperError, match="tras 3 intentos"):
+                fetch_clean_text("https://lento.com")
+
+        # 1 intento inicial + 2 reintentos = 3 navegaciones, 2 backoffs.
+        assert page.goto.call_count == 3
+        assert no_sleep.call_count == 2
+
+    def test_network_error_retries_then_raises(self, real_mode, no_sleep):
+        cm, _browser, _context, page = _build_playwright_mock(
+            goto_side_effect=PlaywrightError("net::ERR_NAME_NOT_RESOLVED")
+        )
+        with patch.object(scraper, "sync_playwright", cm):
+            with pytest.raises(ScraperError):
+                fetch_clean_text("https://inexistente.invalid")
+        assert page.goto.call_count == 3
+
+    def test_recovers_after_transient_failures(self, real_mode, no_sleep):
+        cm, _browser, _context, page = _build_playwright_mock(
+            inner_text="contenido real",
+            goto_side_effect=[
+                PlaywrightTimeoutError("timeout"),
+                PlaywrightError("net::ERR_CONNECTION_RESET"),
+                _response(200),
+            ],
+        )
+        with patch.object(scraper, "sync_playwright", cm):
+            result = fetch_clean_text("https://intermitente.com")
+
+        assert result == "contenido real"
+        assert page.goto.call_count == 3
+        assert no_sleep.call_count == 2
+
+    @pytest.mark.parametrize("status", [403, 429])
+    def test_anti_bot_status_raises_without_retry(self, status, real_mode, no_sleep):
+        cm, _browser, _context, page = _build_playwright_mock(status=status)
+        with patch.object(scraper, "sync_playwright", cm):
+            with pytest.raises(ScraperError, match=f"HTTP {status}"):
+                fetch_clean_text("https://bloqueado.com")
+
+        # Bloqueo determinista: no se reintenta.
+        assert page.goto.call_count == 1
+        assert no_sleep.call_count == 0
+
+    def test_captcha_detected_raises_without_retry(self, real_mode, no_sleep):
+        cm, _browser, _context, page = _build_playwright_mock(has_captcha=True)
+        with patch.object(scraper, "sync_playwright", cm):
+            with pytest.raises(ScraperError, match="CAPTCHA"):
+                fetch_clean_text("https://con-captcha.com")
+        assert page.goto.call_count == 1
+        assert no_sleep.call_count == 0
+
+    def test_closes_browser_on_each_failed_attempt(self, real_mode, no_sleep):
+        cm, browser, _context, _page = _build_playwright_mock(
+            goto_side_effect=PlaywrightTimeoutError("timeout")
+        )
+        with patch.object(scraper, "sync_playwright", cm):
+            with pytest.raises(ScraperError):
+                fetch_clean_text("https://lento.com")
+        # El browser se cierra en cada intento (sin leaks de Chromium).
+        assert browser.close.call_count == 3
+
+    def test_scraper_error_is_exception_subclass(self):
+        # El Scout captura Exception por fuente; ScraperError debe ser capturable así.
+        assert issubclass(ScraperError, Exception)
 
 
 class TestCleanScrapedText:

@@ -29,6 +29,9 @@ class Settings(BaseSettings):
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
     )
+    # Reintentos ante timeout/error de red (además del intento inicial).
+    # Env: SCRAPER_MAX_RETRIES. Default 2 → hasta 3 intentos totales.
+    scraper_max_retries: int = 2
 
     # ─── LLM ─────────────────────────────────────────────────────────────────
     llm_model: str = "google/gemma-4-26b-a4b-it"
