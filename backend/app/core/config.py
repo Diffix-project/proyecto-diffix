@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     # ─── MercadoLibre ────────────────────────────────────────────────────────
     ml_client_id: str = ""
     ml_client_secret: str = ""
+    ml_api_base_url: str = "https://api.mercadolibre.com"
 
     # ─── Resend ──────────────────────────────────────────────────────────────
     resend_api_key: str = ""
