@@ -21,6 +21,9 @@ dependencies = [
     "boto3>=1.34",
     "python-multipart>=0.0.9",
     "pgvector>=0.3",
+    # Pin al minor de la imagen oficial mcr.microsoft.com/playwright/python:v1.60.0-jammy
+    # para que el browser preinstalado en el container coincida con el paquete pip.
+    "playwright==1.60.*",
 ]
 
 [project.optional-dependencies]

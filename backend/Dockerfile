@@ -1,9 +1,10 @@
-# Imagen base con Python 3.12.
-# Para fases de scraping con Playwright se puede cambiar la base a
-# mcr.microsoft.com/playwright/python:v1.45.0-jammy sin cambiar el resto del archivo.
+# Imagen base oficial de Playwright (Ubuntu jammy) con Chromium + deps del sistema
+# preinstalados en /ms-playwright. El tag debe coincidir con el pin de `playwright`
+# en pyproject.toml (1.60.*) para que el browser empaquetado matchee el paquete pip.
+# uv gestiona su propio Python 3.12 (la imagen trae 3.10 de sistema, no se usa).
 # El worker y beat usan la misma imagen con un command override en docker-compose.yml.
 
-FROM python:3.12-slim AS base
+FROM mcr.microsoft.com/playwright/python:v1.60.0-jammy AS base
 
 # Instalar dependencias del sistema necesarias para psycopg (libpq)
 RUN apt-get update && apt-get install -y --no-install-recommends \
