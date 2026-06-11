@@ -120,20 +120,14 @@ def get_seller_listings(seller_id: str, max_listings: int = 200) -> list[dict]:
         }
 
         try:
-            response = httpx.get(
-                url, params=params, headers=_headers(), timeout=30.0
-            )
+            response = httpx.get(url, params=params, headers=_headers(), timeout=30.0)
 
             if response.status_code == 404:
-                raise MercadoLibreAPIError(
-                    f"Seller no encontrado: {seller_id}"
-                )
+                raise MercadoLibreAPIError(f"Seller no encontrado: {seller_id}")
 
             if response.status_code == 429:
                 retry_after = int(response.headers.get("Retry-After", 5))
-                logger.warning(
-                    "mercadolibre: rate limit, esperando %ds", retry_after
-                )
+                logger.warning("mercadolibre: rate limit, esperando %ds", retry_after)
                 time.sleep(retry_after)
                 continue
 
@@ -164,9 +158,7 @@ def get_seller_listings(seller_id: str, max_listings: int = 200) -> list[dict]:
                 break
 
         except httpx.RequestError as e:
-            logger.error(
-                "mercadolibre: error de red al obtener listings: %s", e
-            )
+            logger.error("mercadolibre: error de red al obtener listings: %s", e)
             raise MercadoLibreAPIError(f"Error de red: {e}") from e
 
     listings.sort(key=lambda x: x.get("last_updated") or "", reverse=True)
@@ -202,9 +194,7 @@ def get_seller_reputation(seller_id: str) -> dict:
 
         if response.status_code == 429:
             retry_after = int(response.headers.get("Retry-After", 5))
-            logger.warning(
-                "mercadolibre: rate limit en reputación, esperando %ds", retry_after
-            )
+            logger.warning("mercadolibre: rate limit en reputación, esperando %ds", retry_after)
             time.sleep(retry_after)
             return get_seller_reputation(seller_id)
 
@@ -229,10 +219,9 @@ def get_seller_reputation(seller_id: str) -> dict:
         return result
 
     except httpx.RequestError as e:
-        logger.error(
-            "mercadolibre: error de red al obtener reputación: %s", e
-        )
+        logger.error("mercadolibre: error de red al obtener reputación: %s", e)
         raise MercadoLibreAPIError(f"Error de red: {e}") from e
+
 
 _MOCK_SELLER_STATE: dict = {
     "seller_id": "mock_seller",

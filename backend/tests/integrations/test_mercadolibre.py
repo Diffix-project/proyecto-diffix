@@ -33,9 +33,7 @@ def clear_token_cache():
 @pytest.fixture
 def ml_settings(monkeypatch):
     """Configura settings de MercadoLibre para tests."""
-    monkeypatch.setattr(
-        "app.integrations.mercadolibre.settings.ml_client_id", "test_client_id"
-    )
+    monkeypatch.setattr("app.integrations.mercadolibre.settings.ml_client_id", "test_client_id")
     monkeypatch.setattr(
         "app.integrations.mercadolibre.settings.ml_client_secret", "test_client_secret"
     )
@@ -115,12 +113,8 @@ class TestGetAccessToken:
 
     def test_missing_credentials(self, monkeypatch):
         """Test: credenciales faltantes lanzan excepción."""
-        monkeypatch.setattr(
-            "app.integrations.mercadolibre.settings.ml_client_id", ""
-        )
-        monkeypatch.setattr(
-            "app.integrations.mercadolibre.settings.ml_client_secret", ""
-        )
+        monkeypatch.setattr("app.integrations.mercadolibre.settings.ml_client_id", "")
+        monkeypatch.setattr("app.integrations.mercadolibre.settings.ml_client_secret", "")
 
         with pytest.raises(MercadoLibreAuthError) as exc_info:
             get_access_token()
@@ -277,9 +271,7 @@ class TestGetSellerListings:
                 json={"results": [{"id": "MLA1", "title": "Test", "price": 100.0}]},
             )
 
-        respx.get("https://api.mercadolibre.com/sites/MLA/search").mock(
-            side_effect=side_effect
-        )
+        respx.get("https://api.mercadolibre.com/sites/MLA/search").mock(side_effect=side_effect)
 
         monkeypatch.setattr("app.integrations.mercadolibre.time.sleep", lambda x: None)
 
@@ -376,9 +368,7 @@ class TestGetSellerState:
 
     def test_get_seller_state_mock_mode(self, monkeypatch):
         """Test: modo mock retorna datos de ejemplo."""
-        monkeypatch.setattr(
-            "app.integrations.mercadolibre.settings.use_mocks", True
-        )
+        monkeypatch.setattr("app.integrations.mercadolibre.settings.use_mocks", True)
 
         state = get_seller_state("mock_seller_123")
 
@@ -390,9 +380,7 @@ class TestGetSellerState:
     @respx.mock
     def test_get_seller_state_real_mode(self, ml_settings, monkeypatch):
         """Test: modo real combina listings + reputation."""
-        monkeypatch.setattr(
-            "app.integrations.mercadolibre.settings.use_mocks", False
-        )
+        monkeypatch.setattr("app.integrations.mercadolibre.settings.use_mocks", False)
 
         respx.post("https://api.mercadolibre.com/oauth/token").mock(
             return_value=Response(
@@ -452,9 +440,7 @@ class TestGetSellerState:
     @respx.mock
     def test_seller_state_partial_error_listings(self, ml_settings, monkeypatch):
         """Test: error en listings no bloquea reputation."""
-        monkeypatch.setattr(
-            "app.integrations.mercadolibre.settings.use_mocks", False
-        )
+        monkeypatch.setattr("app.integrations.mercadolibre.settings.use_mocks", False)
 
         respx.post("https://api.mercadolibre.com/oauth/token").mock(
             return_value=Response(
@@ -486,9 +472,7 @@ class TestGetSellerState:
     @respx.mock
     def test_seller_state_partial_error_reputation(self, ml_settings, monkeypatch):
         """Test: error en reputation no bloquea listings."""
-        monkeypatch.setattr(
-            "app.integrations.mercadolibre.settings.use_mocks", False
-        )
+        monkeypatch.setattr("app.integrations.mercadolibre.settings.use_mocks", False)
 
         respx.post("https://api.mercadolibre.com/oauth/token").mock(
             return_value=Response(
