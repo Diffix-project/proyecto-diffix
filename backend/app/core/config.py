@@ -56,6 +56,8 @@ class Settings(BaseSettings):
 
     # ─── Apify ───────────────────────────────────────────────────────────────
     apify_token: str = ""
+    apify_actor_id: str = "apify/linkedin-jobs-scraper"
+    apify_api_base_url: str = "https://api.apify.com/v2"
 
     # ─── MercadoLibre ────────────────────────────────────────────────────────
     ml_client_id: str = ""
