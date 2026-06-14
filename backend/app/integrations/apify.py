@@ -11,7 +11,9 @@ En modo real usa la API de Apify (stub para fase Scout).
 """
 
 import logging
+import re
 import time
+from datetime import UTC, datetime, timedelta
 
 import httpx
 
@@ -26,6 +28,22 @@ _MAX_RATE_LIMIT_RETRIES = 5
 # Estados terminales del run de Apify.
 _RUN_STATUS_SUCCEEDED = "SUCCEEDED"
 _RUN_STATUS_TERMINAL_ERRORS = {"FAILED", "ABORTED", "TIMED-OUT"}
+# Campos donde Apify puede traer la fecha de publicación, en orden de prioridad.
+_POSTED_DATE_FIELDS = ("postedDate", "postedAt", "createdAt")
+# Unidades de tiempo para fechas relativas ("3 days ago").
+_RELATIVE_UNIT_DAYS = {
+    "hour": 0,
+    "hora": 0,
+    "minute": 0,
+    "minuto": 0,
+    "day": 1,
+    "dia": 1,
+    "día": 1,
+    "week": 7,
+    "semana": 7,
+    "month": 30,
+    "mes": 30,
+}
 
 
 class ApifyError(Exception):
@@ -234,6 +252,96 @@ def get_dataset_items(run_id: str) -> list[dict]:
     return items
 
 
+def _parse_posting_date(value) -> datetime | None:
+    """
+    Parsea una fecha de publicación a datetime timezone-aware (UTC).
+
+    Soporta ISO 8601 (con o sin 'Z') y fechas relativas en inglés/español
+    ("3 days ago", "hace 2 semanas", "today", "yesterday").
+
+    Returns:
+        datetime en UTC, o None si no se puede parsear.
+    """
+    if not value:
+        return None
+
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+    text = str(value).strip().lower()
+    now = datetime.now(UTC)
+
+    if text in ("today", "hoy"):
+        return now
+    if text in ("yesterday", "ayer"):
+        return now - timedelta(days=1)
+
+    # Relativo: "3 days ago", "hace 2 semanas", "1 month ago".
+    match = re.search(r"(\d+)\s*(hour|hora|minute|minuto|day|d[ií]a|week|semana|month|mes)", text)
+    if match:
+        amount = int(match.group(1))
+        unit_days = _RELATIVE_UNIT_DAYS.get(match.group(2), None)
+        if unit_days is not None:
+            return now - timedelta(days=amount * unit_days)
+
+    # ISO 8601.
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+    except ValueError:
+        return None
+
+
+def _raw_posted_date(item: dict):
+    """Devuelve el primer campo de fecha disponible del item de Apify."""
+    for field in _POSTED_DATE_FIELDS:
+        if item.get(field):
+            return item[field]
+    return None
+
+
+def filter_postings_by_date(items: list[dict], since_days: int) -> list[dict]:
+    """
+    Filtra postings publicados en los últimos `since_days` días.
+
+    Los postings sin fecha parseable se descartan con un warning.
+    """
+    cutoff = datetime.now(UTC) - timedelta(days=since_days)
+    filtered: list[dict] = []
+
+    for item in items:
+        posted = _parse_posting_date(_raw_posted_date(item))
+        if posted is None:
+            logger.warning(
+                "apify: posting sin fecha parseable, descartado: %s",
+                item.get("title") or item.get("url") or "<sin título>",
+            )
+            continue
+        if posted >= cutoff:
+            filtered.append(item)
+
+    logger.debug("apify: %d/%d postings dentro de %d días", len(filtered), len(items), since_days)
+    return filtered
+
+
+def normalize_job_posting(item: dict) -> dict:
+    """
+    Normaliza un item de Apify al shape interno usado por JobsStrategy.
+
+    Mapea los nombres de campos de Apify a los nombres internos, con
+    fallbacks para las variaciones más comunes del actor.
+    """
+    return {
+        "title": item.get("title"),
+        "company": item.get("companyName") or item.get("company"),
+        "location": item.get("location"),
+        "description": item.get("description"),
+        "posted_at": _raw_posted_date(item),
+        "url": item.get("jobUrl") or item.get("url") or item.get("link"),
+        "seniority_level": item.get("seniorityLevel") or item.get("experienceLevel"),
+    }
+
+
 _MOCK_JOB_POSTINGS: list[dict] = [
     {
         "title": "Desarrollador Backend Python",
@@ -242,6 +350,7 @@ _MOCK_JOB_POSTINGS: list[dict] = [
         "posted_at": "2026-05-28",
         "url": "https://www.linkedin.com/jobs/view/mock-1",
         "description": "Buscamos desarrollador Python con experiencia en FastAPI y PostgreSQL.",
+        "seniority_level": "Mid-Senior level",
     },
     {
         "title": "Jefe de Ventas Zona Norte",
@@ -250,6 +359,7 @@ _MOCK_JOB_POSTINGS: list[dict] = [
         "posted_at": "2026-05-30",
         "url": "https://www.linkedin.com/jobs/view/mock-2",
         "description": "Responsable de expandir cartera de clientes en zona norte GBA.",
+        "seniority_level": "Director",
     },
 ]
 
@@ -258,8 +368,12 @@ def get_job_postings(company_name: str, since_days: int = 30) -> list[dict]:
     """
     Devuelve publicaciones de empleo de la empresa en los últimos `since_days` días.
 
-    Mock: lista de ejemplo sin llamada de red.
-    Real: TODO — implementar en fase Scout usando el actor de Apify para LinkedIn Jobs.
+    Mock: lista de ejemplo sin llamada de red (`USE_MOCKS=true`).
+    Real: ejecuta el actor de LinkedIn Jobs en Apify, espera el resultado,
+    filtra por fecha y normaliza al shape interno.
+
+    Raises:
+        ApifyError (y subclases): ante errores de la API, timeout o run fallido.
     """
     if settings.use_mocks:
         logger.debug(
@@ -267,9 +381,9 @@ def get_job_postings(company_name: str, since_days: int = 30) -> list[dict]:
         )
         return [dict(p, company=company_name) for p in _MOCK_JOB_POSTINGS]
 
-    # Real: fase Scout
-    # TODO (fase Scout): llamar a la API de Apify:
-    #   POST https://api.apify.com/v2/acts/{actor_id}/runs?token={APIFY_TOKEN}
-    #   Actor recomendado: apify/linkedin-jobs-scraper
-    #   Filtrar resultados por fecha >= now() - since_days
-    raise NotImplementedError("apify real mode: completar en fase Scout")
+    logger.debug("apify get_job_postings company=%s since_days=%d", company_name, since_days)
+    run_id = run_linkedin_scraper([company_name])
+    poll_run_result(run_id)
+    items = get_dataset_items(run_id)
+    filtered = filter_postings_by_date(items, since_days)
+    return [normalize_job_posting(item) for item in filtered]
