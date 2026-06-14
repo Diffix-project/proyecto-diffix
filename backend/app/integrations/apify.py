@@ -12,9 +12,77 @@ En modo real usa la API de Apify (stub para fase Scout).
 
 import logging
 
+import httpx
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+class ApifyError(Exception):
+    """Error genérico de la integración con Apify."""
+
+    pass
+
+
+class ApifyAuthError(ApifyError):
+    """Error de autenticación con la API de Apify (token inválido o faltante)."""
+
+    pass
+
+
+def _apify_headers() -> dict:
+    """
+    Retorna headers de autenticación para la API de Apify.
+
+    Raises:
+        ApifyAuthError: Si no hay token configurado.
+    """
+    if not settings.apify_token:
+        raise ApifyAuthError(
+            "apify_token es requerido. Configurar APIFY_TOKEN en .env "
+            "o usar USE_MOCKS=true para desarrollo local."
+        )
+    return {
+        "Authorization": f"Bearer {settings.apify_token}",
+        "Accept": "application/json",
+    }
+
+
+def verify_token() -> dict:
+    """
+    Verifica que el token de Apify es válido con un call a GET /v2/users/me.
+
+    Returns:
+        Datos del usuario autenticado (campo `data` del response).
+
+    Raises:
+        ApifyAuthError: Si el token es inválido (401/403) o falta.
+        ApifyError: Ante otros errores de la API o de red.
+    """
+    url = f"{settings.apify_api_base_url}/users/me"
+    try:
+        response = httpx.get(url, headers=_apify_headers(), timeout=30.0)
+
+        if response.status_code in (401, 403):
+            raise ApifyAuthError(f"Token de Apify inválido: {response.status_code}")
+
+        response.raise_for_status()
+        data = response.json().get("data", {})
+        logger.debug("apify: token verificado, usuario=%s", data.get("username"))
+        return data
+
+    except httpx.HTTPStatusError as e:
+        logger.error(
+            "apify: error al verificar token status=%d response=%s",
+            e.response.status_code,
+            e.response.text,
+        )
+        raise ApifyError(f"Error al verificar token de Apify: {e.response.status_code}") from e
+    except httpx.RequestError as e:
+        logger.error("apify: error de red al verificar token: %s", e)
+        raise ApifyError(f"Error de red al verificar token: {e}") from e
+
 
 _MOCK_JOB_POSTINGS: list[dict] = [
     {
