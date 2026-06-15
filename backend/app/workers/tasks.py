@@ -111,52 +111,53 @@ def scout_competitor(self, competitor_id: str):  # type: ignore[no-untyped-def]
         source_data = [(s.id, s.source_type) for s in sources]
 
         for source_id, source_type in source_data:
+            change_id_for_analysis: str | None = None
             try:
-                source = db.query(CompetitorSource).filter(CompetitorSource.id == source_id).one()
-                content = fetch_source_content(source)
-                content_hash = compute_hash(content)
-                last_snapshot = get_last_snapshot(db, source_id)
-
-                if last_snapshot and last_snapshot.content_hash == content_hash:
-                    logger.debug(
-                        "scout_competitor: fuente %s sin cambios (hash idéntico)",
-                        source_id,
+                # Cada fuente se procesa en su propio savepoint: un fallo solo
+                # revierte los cambios de esa fuente, sin afectar a las demás.
+                with db.begin_nested():
+                    source = (
+                        db.query(CompetitorSource).filter(CompetitorSource.id == source_id).one()
                     )
+                    content = fetch_source_content(source)
+                    content_hash = compute_hash(content)
+                    last_snapshot = get_last_snapshot(db, source_id)
+
+                    if last_snapshot and last_snapshot.content_hash == content_hash:
+                        logger.debug(
+                            "scout_competitor: fuente %s sin cambios (hash idéntico)",
+                            source_id,
+                        )
+                        source.last_checked_at = sa.func.now()  # type: ignore[assignment]
+                        continue
+
+                    new_snapshot = create_snapshot(db, source, content, content_hash)
+
+                    if last_snapshot:
+                        diff_text, diff_raw = compute_diff(last_snapshot.content, content)
+                        section = detect_section(source_type, content)
+                        change = create_change(
+                            db,
+                            source,
+                            last_snapshot,
+                            new_snapshot,
+                            diff_text,
+                            diff_raw,
+                            section,
+                        )
+                        change_id_for_analysis = str(change.id)
+                        logger.info(
+                            "scout_competitor: cambio detectado en fuente %s, change_id=%s",
+                            source_id,
+                            change.id,
+                        )
+                    else:
+                        logger.info(
+                            "scout_competitor: primer snapshot para fuente %s",
+                            source_id,
+                        )
+
                     source.last_checked_at = sa.func.now()  # type: ignore[assignment]
-                    db.commit()
-                    continue
-
-                new_snapshot = create_snapshot(db, source, content, content_hash)
-
-                if last_snapshot:
-                    diff_text, diff_raw = compute_diff(last_snapshot.content, content)
-                    section = detect_section(source_type, content)
-                    change = create_change(
-                        db,
-                        source,
-                        last_snapshot,
-                        new_snapshot,
-                        diff_text,
-                        diff_raw,
-                        section,
-                    )
-                    db.commit()
-
-                    analyze_change.delay(str(change.id))
-                    logger.info(
-                        "scout_competitor: cambio detectado en fuente %s, change_id=%s",
-                        source_id,
-                        change.id,
-                    )
-                else:
-                    db.commit()
-                    logger.info(
-                        "scout_competitor: primer snapshot para fuente %s",
-                        source_id,
-                    )
-
-                source.last_checked_at = sa.func.now()  # type: ignore[assignment]
-                db.commit()
 
             except NotImplementedError as exc:
                 logger.warning(
@@ -164,17 +165,19 @@ def scout_competitor(self, competitor_id: str):  # type: ignore[no-untyped-def]
                     source_id,
                     exc,
                 )
-                db.rollback()
                 continue
             except Exception as exc:
                 logger.error(
-                    "scout_competitor: error procesando fuente %s: %s",
+                    "scout_competitor: error procesando fuente %s (type=%s): %s",
                     source_id,
+                    source_type,
                     exc,
                     exc_info=True,
                 )
-                db.rollback()
                 continue
+
+            if change_id_for_analysis:
+                analyze_change.delay(change_id_for_analysis)
 
         logger.info("scout_competitor: competidor %s procesado correctamente", competitor_name)
 

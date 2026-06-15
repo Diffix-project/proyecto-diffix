@@ -11,6 +11,9 @@ from unittest.mock import MagicMock, patch
 
 from app.domains.competitors.models import Competitor
 from app.domains.sources.models import CompetitorSource
+from app.integrations.apify import ApifyAuthError
+from app.integrations.mercadolibre import MercadoLibreAPIError
+from app.integrations.scraper import ScraperError
 
 
 class TestScoutCompetitorTask:
@@ -328,6 +331,274 @@ class TestScoutCompetitorTask:
             from app.workers.tasks import scout_competitor
 
             scout_competitor(fake_id)
+
+    def test_three_sources_one_failure_continues(self, db, test_user):
+        """Si una de 3 fuentes falla, las otras 2 se procesan normalmente."""
+        company = test_user.company
+        competitor = Competitor(
+            company_id=company.id,
+            name="Multi Source",
+            website_url="https://multi.com",
+        )
+        db.add(competitor)
+        db.flush()
+
+        website = CompetitorSource(
+            competitor_id=competitor.id,
+            source_type="website",
+            source_url="https://multi.com",
+            is_active=True,
+        )
+        ml = CompetitorSource(
+            competitor_id=competitor.id,
+            source_type="mercadolibre",
+            config={"seller_id": "123"},
+            is_active=True,
+        )
+        jobs = CompetitorSource(
+            competitor_id=competitor.id,
+            source_type="jobs",
+            is_active=True,
+        )
+        db.add_all([website, ml, jobs])
+        db.commit()
+
+        with (
+            patch("app.workers.tasks.SessionLocal") as mock_session_local,
+            patch("app.agents.scout.strategies.fetch_clean_text") as mock_scraper,
+            patch("app.agents.scout.strategies.get_seller_state") as mock_ml,
+            patch("app.agents.scout.strategies.get_job_postings") as mock_jobs,
+        ):
+            mock_session_local.return_value = db
+            mock_scraper.side_effect = ScraperError("timeout")
+            mock_ml.return_value = {"seller_id": "123"}
+            mock_jobs.return_value = [{"title": "Dev"}]
+
+            from app.workers.tasks import scout_competitor
+
+            scout_competitor(str(competitor.id))
+
+        assert mock_scraper.call_count == 1
+        assert mock_ml.call_count == 1
+        assert mock_jobs.call_count == 1
+
+    def test_mercadolibre_404_does_not_block_others(self, db, test_user):
+        """Un seller_id inexistente en ML no detiene el resto de las fuentes."""
+        company = test_user.company
+        competitor = Competitor(
+            company_id=company.id,
+            name="ML 404",
+            website_url="https://ml404.com",
+        )
+        db.add(competitor)
+        db.flush()
+
+        website = CompetitorSource(
+            competitor_id=competitor.id,
+            source_type="website",
+            source_url="https://ml404.com",
+            is_active=True,
+        )
+        ml = CompetitorSource(
+            competitor_id=competitor.id,
+            source_type="mercadolibre",
+            config={"seller_id": "no_existe"},
+            is_active=True,
+        )
+        db.add_all([website, ml])
+        db.commit()
+
+        with (
+            patch("app.workers.tasks.SessionLocal") as mock_session_local,
+            patch("app.agents.scout.strategies.fetch_clean_text") as mock_scraper,
+            patch("app.agents.scout.strategies.get_seller_state") as mock_ml,
+        ):
+            mock_session_local.return_value = db
+            mock_scraper.return_value = "content"
+            mock_ml.side_effect = MercadoLibreAPIError("Seller no encontrado: no_existe")
+
+            from app.workers.tasks import scout_competitor
+
+            scout_competitor(str(competitor.id))
+
+        assert mock_scraper.call_count == 1
+        assert mock_ml.call_count == 1
+
+    def test_apify_invalid_token_does_not_block_others(self, db, test_user):
+        """Un token inválido de Apify no detiene el resto de las fuentes."""
+        company = test_user.company
+        competitor = Competitor(
+            company_id=company.id,
+            name="Apify Auth",
+            website_url="https://apifyauth.com",
+        )
+        db.add(competitor)
+        db.flush()
+
+        website = CompetitorSource(
+            competitor_id=competitor.id,
+            source_type="website",
+            source_url="https://apifyauth.com",
+            is_active=True,
+        )
+        jobs = CompetitorSource(
+            competitor_id=competitor.id,
+            source_type="jobs",
+            is_active=True,
+        )
+        db.add_all([website, jobs])
+        db.commit()
+
+        with (
+            patch("app.workers.tasks.SessionLocal") as mock_session_local,
+            patch("app.agents.scout.strategies.fetch_clean_text") as mock_scraper,
+            patch("app.agents.scout.strategies.get_job_postings") as mock_jobs,
+        ):
+            mock_session_local.return_value = db
+            mock_scraper.return_value = "content"
+            mock_jobs.side_effect = ApifyAuthError("Token de Apify inválido")
+
+            from app.workers.tasks import scout_competitor
+
+            scout_competitor(str(competitor.id))
+
+        assert mock_scraper.call_count == 1
+        assert mock_jobs.call_count == 1
+
+    def test_failed_source_is_logged_with_context(self, db, test_user, caplog):
+        """El error de una fuente queda logueado con source_id y source_type."""
+        import logging
+
+        company = test_user.company
+        competitor = Competitor(
+            company_id=company.id,
+            name="Log Context",
+            website_url="https://log.com",
+        )
+        db.add(competitor)
+        db.flush()
+
+        source = CompetitorSource(
+            competitor_id=competitor.id,
+            source_type="website",
+            source_url="https://log.com",
+            is_active=True,
+        )
+        db.add(source)
+        db.flush()
+        source_id = source.id
+        db.commit()
+
+        with (
+            patch("app.workers.tasks.SessionLocal") as mock_session_local,
+            patch("app.agents.scout.strategies.fetch_clean_text") as mock_scraper,
+        ):
+            mock_session_local.return_value = db
+            mock_scraper.side_effect = ScraperError("bloqueo anti-bot")
+
+            with caplog.at_level(logging.ERROR, logger="app.workers.tasks"):
+                from app.workers.tasks import scout_competitor
+
+                scout_competitor(str(competitor.id))
+
+        assert str(source_id) in caplog.text
+        assert "type=website" in caplog.text
+        assert "bloqueo anti-bot" in caplog.text
+
+    def test_last_checked_at_only_for_successful_sources(self, db, test_user):
+        """last_checked_at se actualiza solo para fuentes que se procesaron."""
+        company = test_user.company
+        competitor = Competitor(
+            company_id=company.id,
+            name="Last Checked",
+            website_url="https://last.com",
+        )
+        db.add(competitor)
+        db.flush()
+
+        ok_source = CompetitorSource(
+            competitor_id=competitor.id,
+            source_type="website",
+            source_url="https://last.com/ok",
+            is_active=True,
+            last_checked_at=None,
+        )
+        fail_source = CompetitorSource(
+            competitor_id=competitor.id,
+            source_type="website",
+            source_url="https://last.com/fail",
+            is_active=True,
+            last_checked_at=None,
+        )
+        db.add_all([ok_source, fail_source])
+        db.flush()
+        ok_id, fail_id = ok_source.id, fail_source.id
+        db.commit()
+
+        with (
+            patch("app.workers.tasks.SessionLocal") as mock_session_local,
+            patch("app.agents.scout.strategies.fetch_clean_text") as mock_scraper,
+        ):
+            mock_session_local.return_value = db
+
+            def side_effect(url: str):
+                if "fail" in url:
+                    raise ScraperError("timeout")
+                return "content"
+
+            mock_scraper.side_effect = side_effect
+
+            from app.workers.tasks import scout_competitor
+
+            scout_competitor(str(competitor.id))
+
+        from app.domains.sources.models import CompetitorSource as CS
+
+        updated_ok = db.query(CS).filter(CS.id == ok_id).first()
+        updated_fail = db.query(CS).filter(CS.id == fail_id).first()
+
+        assert updated_ok.last_checked_at is not None
+        assert updated_fail.last_checked_at is None
+
+    def test_all_sources_fail_scout_does_not_raise(self, db, test_user):
+        """Si todas las fuentes fallan, scout_competitor loggea y no lanza excepción."""
+        company = test_user.company
+        competitor = Competitor(
+            company_id=company.id,
+            name="All Fail",
+            website_url="https://allfail.com",
+        )
+        db.add(competitor)
+        db.flush()
+
+        source1 = CompetitorSource(
+            competitor_id=competitor.id,
+            source_type="website",
+            source_url="https://allfail.com/1",
+            is_active=True,
+        )
+        source2 = CompetitorSource(
+            competitor_id=competitor.id,
+            source_type="website",
+            source_url="https://allfail.com/2",
+            is_active=True,
+        )
+        db.add_all([source1, source2])
+        db.commit()
+
+        with (
+            patch("app.workers.tasks.SessionLocal") as mock_session_local,
+            patch("app.agents.scout.strategies.fetch_clean_text") as mock_scraper,
+        ):
+            mock_session_local.return_value = db
+            mock_scraper.side_effect = ScraperError("error")
+
+            from app.workers.tasks import scout_competitor
+
+            # No debe lanzar excepción
+            scout_competitor(str(competitor.id))
+
+        assert mock_scraper.call_count == 2
 
 
 class TestRunDailyMonitoring:
