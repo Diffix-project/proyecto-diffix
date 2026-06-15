@@ -96,9 +96,6 @@ def e2e_user(e2e_db: Session) -> User:
     return upsert_user_from_clerk(e2e_db, clerk_id="e2e_user", email="e2e@vigi.ai", name="E2E")
 
 
-
-
-
 class _MutableHandler(BaseHTTPRequestHandler):
     """Handler que devuelve el HTML almacenado en la clase."""
 
@@ -376,9 +373,7 @@ class TestScoutEndToEndSemiReal:
 
 class TestScoutEndToEndRealIntegrations:
     @pytest.mark.skipif(
-        not bool(
-            os.environ.get("ML_CLIENT_ID") and os.environ.get("ML_CLIENT_SECRET")
-        ),
+        not bool(os.environ.get("ML_CLIENT_ID") and os.environ.get("ML_CLIENT_SECRET")),
         reason="Requiere ML_CLIENT_ID y ML_CLIENT_SECRET",
     )
     def test_mercadolibre_real_seller_state(
@@ -426,9 +421,7 @@ class TestScoutEndToEndRealIntegrations:
         not bool(os.environ.get("APIFY_TOKEN")),
         reason="Requiere APIFY_TOKEN",
     )
-    def test_apify_real_job_postings(
-        self, e2e_engine, e2e_db, e2e_user, local_website_server
-    ):
+    def test_apify_real_job_postings(self, e2e_engine, e2e_db, e2e_user, local_website_server):
         """E2E real con Apify (solo si hay token)."""
         company = e2e_user.company
         competitor = Competitor(
