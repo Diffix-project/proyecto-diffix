@@ -6,9 +6,23 @@ Verifica el flujo completo desde run_daily_monitoring hasta la creación de Chan
 
 from unittest.mock import patch
 
+from sqlalchemy.orm import Session
+
 from app.domains.changes.models import Change, Snapshot
 from app.domains.competitors.models import Competitor
 from app.domains.sources.models import CompetitorSource
+
+# ─── Helpers de conteo para assertions de idempotencia ────────────────────────
+
+
+def count_snapshots(db: Session, source_id) -> int:
+    """Cuenta snapshots de una fuente."""
+    return db.query(Snapshot).filter(Snapshot.source_id == source_id).count()
+
+
+def count_changes(db: Session, source_id) -> int:
+    """Cuenta changes de una fuente."""
+    return db.query(Change).filter(Change.source_id == source_id).count()
 
 
 class TestScoutEndToEnd:
@@ -183,8 +197,143 @@ class TestScoutEndToEnd:
 
         db.expire_all()
 
-        snapshots = db.query(Snapshot).filter(Snapshot.source_id == source_id).all()
-        assert len(snapshots) == 1
+        assert count_snapshots(db, source_id) == 1
+        assert count_changes(db, source_id) == 0
 
-        changes = db.query(Change).filter(Change.source_id == source_id).all()
-        assert len(changes) == 0
+    def test_idempotency_a_to_b_to_a_generates_two_changes(self, db, test_user):
+        """
+        Transiciones A -> B -> A deben generar exactamente 2 Changes:
+        uno por el cambio a B y otro por el regreso a A.
+        """
+        company = test_user.company
+        competitor = Competitor(
+            company_id=company.id,
+            name="A-B-A Test",
+            website_url="https://aba.com",
+            is_active=True,
+        )
+        db.add(competitor)
+        db.flush()
+        competitor_id = competitor.id
+
+        source = CompetitorSource(
+            competitor_id=competitor.id,
+            source_type="website",
+            source_url="https://aba.com",
+            is_active=True,
+        )
+        db.add(source)
+        db.flush()
+        source_id = source.id
+
+        from app.agents.scout.core import compute_hash
+
+        content_a = "Precio A: $100"
+        content_b = "Precio A: $150"
+
+        first_snapshot = Snapshot(
+            competitor_id=competitor.id,
+            source_id=source.id,
+            source_type="website",
+            content_hash=compute_hash(content_a),
+            content=content_a,
+        )
+        db.add(first_snapshot)
+        db.commit()
+
+        with (
+            patch("app.workers.tasks.SessionLocal") as mock_session_local,
+            patch("app.agents.scout.strategies.fetch_clean_text") as mock_fetch,
+            patch("app.workers.tasks.analyze_change") as mock_analyze,
+        ):
+            mock_session_local.return_value = db
+            mock_analyze.delay = lambda x: None
+
+            from app.workers.tasks import scout_competitor
+
+            # A -> B: debe crear Change
+            mock_fetch.return_value = content_b
+            scout_competitor(str(competitor_id))
+
+            # B -> A: debe crear otro Change
+            mock_fetch.return_value = content_a
+            scout_competitor(str(competitor_id))
+
+        db.expire_all()
+
+        assert count_snapshots(db, source_id) == 3  # inicial + B + A
+        assert count_changes(db, source_id) == 2
+
+        changes = (
+            db.query(Change)
+            .filter(Change.source_id == source_id)
+            .order_by(Change.detected_at)
+            .all()
+        )
+        assert changes[0].snapshot_before.content == content_a
+        assert changes[0].snapshot_after.content == content_b
+        assert changes[1].snapshot_before.content == content_b
+        assert changes[1].snapshot_after.content == content_a
+
+    def test_hash_consistency_same_content_same_hash(self, db, test_user):
+        """El hash SHA256 debe ser determinista para el mismo contenido."""
+        from app.agents.scout.core import compute_hash
+
+        content = "Contenido determinista del Scout"
+        assert compute_hash(content) == compute_hash(content)
+        assert len(compute_hash(content)) == 64
+
+    def test_no_duplicate_snapshots_for_same_hash(self, db, test_user):
+        """Scout no debe crear un snapshot nuevo si el hash no cambió."""
+        company = test_user.company
+        competitor = Competitor(
+            company_id=company.id,
+            name="No Duplicate Snapshot",
+            website_url="https://nodup.com",
+            is_active=True,
+        )
+        db.add(competitor)
+        db.flush()
+        competitor_id = competitor.id
+
+        source = CompetitorSource(
+            competitor_id=competitor.id,
+            source_type="website",
+            source_url="https://nodup.com",
+            is_active=True,
+        )
+        db.add(source)
+        db.flush()
+        source_id = source.id
+
+        from app.agents.scout.core import compute_hash
+
+        content = "Contenido sin cambios"
+        content_hash = compute_hash(content)
+
+        db.add(
+            Snapshot(
+                competitor_id=competitor.id,
+                source_id=source.id,
+                source_type="website",
+                content_hash=content_hash,
+                content=content,
+            )
+        )
+        db.commit()
+
+        with (
+            patch("app.workers.tasks.SessionLocal") as mock_session_local,
+            patch("app.agents.scout.strategies.fetch_clean_text") as mock_fetch,
+        ):
+            mock_session_local.return_value = db
+            mock_fetch.return_value = content
+
+            from app.workers.tasks import scout_competitor
+
+            scout_competitor(str(competitor_id))
+
+        db.expire_all()
+
+        assert count_snapshots(db, source_id) == 1
+        assert count_changes(db, source_id) == 0
