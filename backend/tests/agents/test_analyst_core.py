@@ -43,7 +43,7 @@ class TestGenerateInsight:
         )
 
         assert isinstance(result, AnalystResult)
-        assert result.insight == VALID_INSIGHT
+        assert result.data == VALID_INSIGHT
         assert result.model == "test-model"
         assert result.prompt_tokens == 10
         assert result.completion_tokens == 5
@@ -66,7 +66,7 @@ class TestGenerateInsight:
             section="home",
         )
 
-        assert result.insight == VALID_INSIGHT
+        assert result.data == VALID_INSIGHT
         assert mock_complete.call_count == 3
 
     @patch("app.agents.analyst.core.complete_json")
@@ -102,7 +102,7 @@ class TestGenerateInsight:
             section="general",
         )
 
-        assert result.insight == VALID_INSIGHT
+        assert result.data == VALID_INSIGHT
         assert mock_complete.call_count == 2
 
     @patch("app.agents.analyst.core.complete_json")
