@@ -22,7 +22,9 @@ VALID_INSIGHT = {
 
 
 class MockLLMResult:
-    def __init__(self, data, model="test-model", prompt_tokens=10, completion_tokens=5, trace_id="trace-1"):
+    def __init__(
+        self, data, model="test-model", prompt_tokens=10, completion_tokens=5, trace_id="trace-1"
+    ):
         self.data = data
         self.model = model
         self.prompt_tokens = prompt_tokens

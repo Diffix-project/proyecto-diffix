@@ -16,7 +16,9 @@ from app.domains.sources.models import CompetitorSource
 
 
 class MockLLMResult:
-    def __init__(self, data, model="test-model", prompt_tokens=10, completion_tokens=5, trace_id="trace-1"):
+    def __init__(
+        self, data, model="test-model", prompt_tokens=10, completion_tokens=5, trace_id="trace-1"
+    ):
         self.data = data
         self.model = model
         self.prompt_tokens = prompt_tokens
@@ -77,7 +79,9 @@ class TestCreateInsight:
             "what_to_do": "Revisar márgenes.",
             "urgency": "alta",
         }
-        llm_result = MockLLMResult(data, model="gemini-test", prompt_tokens=100, completion_tokens=50, trace_id="trace-abc")
+        llm_result = MockLLMResult(
+            data, model="gemini-test", prompt_tokens=100, completion_tokens=50, trace_id="trace-abc"
+        )
 
         insight = create_insight(db, sample_change, llm_result)
 
