@@ -23,12 +23,15 @@ class TestValidateInsight:
 
         validate_insight(data)  # no debe lanzar
 
-    @pytest.mark.parametrize("field", [
-        "what_changed",
-        "why_it_matters",
-        "what_to_do",
-        "urgency",
-    ])
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "what_changed",
+            "why_it_matters",
+            "what_to_do",
+            "urgency",
+        ],
+    )
     def test_missing_field_raises(self, field):
         data = {
             "what_changed": "Bajaron el precio.",
@@ -41,12 +44,15 @@ class TestValidateInsight:
         with pytest.raises(InvalidInsightError, match=field):
             validate_insight(data)
 
-    @pytest.mark.parametrize("field", [
-        "what_changed",
-        "why_it_matters",
-        "what_to_do",
-        "urgency",
-    ])
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "what_changed",
+            "why_it_matters",
+            "what_to_do",
+            "urgency",
+        ],
+    )
     def test_empty_field_after_strip_raises(self, field):
         data = {
             "what_changed": "Bajaron el precio.",
