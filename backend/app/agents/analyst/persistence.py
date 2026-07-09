@@ -42,9 +42,7 @@ def create_insight(db: Session, change: Change, llm_result: _LLMResultLike) -> I
     Raises:
         ValueError: Si el Change ya tiene un Insight asociado.
     """
-    existing = db.scalar(
-        sa.select(Insight).where(Insight.change_id == change.id).limit(1)
-    )
+    existing = db.scalar(sa.select(Insight).where(Insight.change_id == change.id).limit(1))
     if existing is not None:
         raise ValueError(f"El change {change.id} ya tiene un insight asociado")
 
