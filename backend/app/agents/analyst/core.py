@@ -24,7 +24,7 @@ class AnalystError(Exception):
 class AnalystResult:
     """Resultado de una generación de insight exitosa."""
 
-    insight: dict
+    data: dict
     model: str
     prompt_tokens: int
     completion_tokens: int
@@ -75,7 +75,7 @@ def generate_insight(
             )
 
             return AnalystResult(
-                insight=llm_result.data,
+                data=llm_result.data,
                 model=llm_result.model,
                 prompt_tokens=llm_result.prompt_tokens,
                 completion_tokens=llm_result.completion_tokens,
